@@ -67,6 +67,7 @@ reversed, add a new entry that says so and why.
 | D40 | 2026-09-14 | Migration 0004 drops NOT NULL from the raw counterparty-name columns. | Real filings omit them: a 2026 John Rose filing reports **$11,000 for "PROFESSIONAL SERVICES" with no vendor named** (3 such rows in 2026 alone). A placeholder would fabricate data. **Analysis views must treat a missing counterparty as a real category**, not assume it away — an unnamed payee is itself worth counting. |
 | D41 | 2026-09-14 | Unparseable source values are kept raw with the cleaned column left null; the parser never guesses. | A 2026 filing by CONCERNED CONSTITUTIONAL CONSERVATIVES PAC is dated **02/29/2026 — a date that does not exist** (2026 is not a leap year). `expenditure_date_raw` preserves it, `expenditure_date` is null. Validates the raw-alongside-cleaned design on real data. |
 | D42 | 2026-09-14 | Loading works on whole `(search_type, year)` slices, tracked in `data_pulls`. | TREF rows carry no stable record id, so row-level dedupe is unsafe — two identical legitimate contributions would be wrongly collapsed. Slice-level tracking makes reloads idempotent and explicit (`--replace`). Verified: a second load skipped and the row count held at 26,765. |
+| D43 | 2026-09-14 | Backfill scope is **2019-2026**, not back to 2002. | Aligns with PLAN.md Phase 3, which starts bills at the 111th General Assembly (2019); campaign finance with no matching legislative record cannot be joined against anything yet. Extending backward to 2002 is explicitly a Phase 10 task and the backfill is resumable, so nothing is foreclosed. |
 | D23 | 2026-09-13 | `.env` is `chmod 600`. | Was `644`, world-readable on a multi-user machine. Disk is FileVault-encrypted and the project is not in a cloud-synced folder, so this closes the remaining local exposure. |
 
 ---
@@ -122,9 +123,13 @@ Things discovered about this machine/accounts that are expensive to rediscover.
    loaded 26,765 rows in 3 seconds via COPY, matching the manifest exactly, with 100%
    provenance and 100% amount parsing.
 3. Send the two bulk requests (`docs/tref_bulk_request.md`, `docs/tap_bulk_request.md`).
-4. Run the real backfill. Nothing blocks it now — capacity resolved (D37/D38), collection
-   and loading both verified end to end. Open question: how far back to go (contributions
-   exist to 2002; PLAN.md only needs 2019 for bills).
+4. **Backfill 2019-2026 is RUNNING** (started 2026-09-14 09:02, detached via nohup,
+   PID in `data/raw/tref/backfill.pid`, log at `data/raw/tref/backfill.log`).
+   15 slices: contributions 2019-2026 + expenditures 2019-2025. Expect several hours.
+   Check with `tail -f data/raw/tref/backfill.log`. It is resumable — rerunning the
+   same command picks up whatever did not finish.
+5. When it finishes: `python -m tn_accountability.load_tref --years 2019-2026`, then
+   Phase 3 (LegiScan bills/sponsors/votes) — needs `LEGISCAN_API_KEY`, still missing.
 
 
 ---

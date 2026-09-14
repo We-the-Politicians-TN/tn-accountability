@@ -68,3 +68,7 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Backfill runtime state (the log and PID of a detached run)
+data/raw/tref/backfill.log
+data/raw/tref/backfill.pid
