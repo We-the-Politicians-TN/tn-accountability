@@ -61,6 +61,12 @@ reversed, add a new entry that says so and why.
 | D34 | 2026-09-13 | The manifest records a SHA-256 per file. | Lets the evidence trail be re-verified later without re-downloading, and catches silent corruption. Verified working: 32/32 files matched on re-check. |
 | D35 | 2026-09-13 | A failed year logs and continues rather than aborting the run. | An overnight backfill must not lose nine good hours to one bad year. Failures are listed at the end and rerunning the same command retries only those. |
 | D36 | 2026-09-13 | **Supabase security confirmed safe by default:** RLS is enabled on all 14 tables with no policies (deny-all), and `anon` holds no SELECT/INSERT/UPDATE/DELETE. | Checked directly, not assumed. Means loaded data is unreadable through the public API until policies are deliberately added. **Phase 8 will have to add read policies** for the public site — that is intended, but it is the moment to get it right. |
+| D37 | 2026-09-14 | Upgraded Supabase to **Pro** (8 GB). | User decision, made before the large load. Supersedes the wait-and-measure stance in D13. |
+| D38 | 2026-09-14 | **Measured** storage: 17 MB for 26,765 expenditure rows = **~635 bytes/row** in Postgres including indexes. | Extrapolates to **~1.6 GB** for the full ~2.5M-row backfill — close to the earlier 1.2-1.5 GB estimate, comfortable in 8 GB, impossible in 500 MB. This is measured, not estimated; prefer it. |
+| D39 | 2026-09-14 | Migrations 0002/0003 add the TREF columns the Phase 1 schema had no home for. | The initial schema was written from PLAN.md's *description* of the data. Real files carry Type, Adj, Election Year, Candidate For, S/O and Description with nowhere to go. Loading would have silently dropped published fields, breaking the keep-raw rule. The loader now refuses to run if a source column is unmapped rather than discarding it. |
+| D40 | 2026-09-14 | Migration 0004 drops NOT NULL from the raw counterparty-name columns. | Real filings omit them: a 2026 John Rose filing reports **$11,000 for "PROFESSIONAL SERVICES" with no vendor named** (3 such rows in 2026 alone). A placeholder would fabricate data. **Analysis views must treat a missing counterparty as a real category**, not assume it away — an unnamed payee is itself worth counting. |
+| D41 | 2026-09-14 | Unparseable source values are kept raw with the cleaned column left null; the parser never guesses. | A 2026 filing by CONCERNED CONSTITUTIONAL CONSERVATIVES PAC is dated **02/29/2026 — a date that does not exist** (2026 is not a leap year). `expenditure_date_raw` preserves it, `expenditure_date` is null. Validates the raw-alongside-cleaned design on real data. |
+| D42 | 2026-09-14 | Loading works on whole `(search_type, year)` slices, tracked in `data_pulls`. | TREF rows carry no stable record id, so row-level dedupe is unsafe — two identical legitimate contributions would be wrongly collapsed. Slice-level tracking makes reloads idempotent and explicit (`--replace`). Verified: a second load skipped and the row count held at 26,765. |
 | D23 | 2026-09-13 | `.env` is `chmod 600`. | Was `644`, world-readable on a multi-user machine. Disk is FileVault-encrypted and the project is not in a cloud-synced folder, so this closes the remaining local exposure. |
 
 ---
@@ -112,9 +118,13 @@ Things discovered about this machine/accounts that are expensive to rediscover.
    (`python -m tn_accountability.backfill --years 2019-2026`). Verified end to end on
    expenditures 2026: 26,765 rows, 32 batches, 3.8 MB, 215s, all checksums matching,
    and a rerun correctly skipped the completed year.
-   **Not built yet: the loader from raw CSV into Postgres.** The database is still empty.
+   The loader is built and verified: `python -m tn_accountability.load_tref --years 2026`
+   loaded 26,765 rows in 3 seconds via COPY, matching the manifest exactly, with 100%
+   provenance and 100% amount parsing.
 3. Send the two bulk requests (`docs/tref_bulk_request.md`, `docs/tap_bulk_request.md`).
-4. Resolve Supabase capacity (D13) before any large load — 500 MB will not hold it.
+4. Run the real backfill. Nothing blocks it now — capacity resolved (D37/D38), collection
+   and loading both verified end to end. Open question: how far back to go (contributions
+   exist to 2002; PLAN.md only needs 2019 for bills).
 
 
 ---
