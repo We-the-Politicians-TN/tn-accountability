@@ -36,6 +36,8 @@ reversed, add a new entry that says so and why.
 | D10 | 2026-09-13 | `contribution_date_raw` and `amount_raw` are `text`, kept alongside parsed values. | A source value that fails to parse is preserved as evidence rather than dropped. Applies the PLAN.md rule that every table keeps raw alongside cleaned. |
 | D11 | 2026-09-13 | Partial unique index on `(source_file, source_record_id)` for contributions and expenditures. | Makes re-ingest idempotent for rows that carry a source identifier. Rows without one still need application-level dedupe — open risk for Phase 7. |
 | D12 | 2026-09-13 | Migrations are append-only, tracked in `schema_migrations` with a SHA-256 of each file. | An applied migration that gets edited is a silent drift bug; the runner refuses to continue if a hash changes. |
+| D13 | 2026-09-13 | Start Supabase on the Free plan despite knowing it is too small for the full Phase 2 backfill. | Free gives 500 MB (verified on supabase.com/pricing). Estimated need is 1.2-1.5 GB for ~2.0M contributions + ~480K expenditures with raw+normalized columns and six indexes on `contributions` — roughly 3x over. But Free costs nothing, Phase 1 fits, and Phase 2 will produce a real bytes-per-row measurement. Upgrade to Pro ($25/mo, 8 GB, then $0.125/GB) when measured, not on an estimate. **Before upgrading, ask Supabase about nonprofit/open-source credits** — the repo is public and the org is a civic project. |
+| D14 | 2026-09-13 | Supabase org named "We the Politicians TN", type Personal. | Matches the GitHub org `We-the-Politicians-TN`. Supabase's org "type" is segmentation metadata only — it does not affect features or billing — so it is not worth agonizing over and is changeable later. |
 
 ---
 
@@ -56,8 +58,8 @@ Things discovered about this machine/accounts that are expensive to rediscover.
 
 | Service | Account created | Credential in `.env` | Notes |
 |---|---|---|---|
-| GitHub | ? | n/a | Repo `tn-accountability` not yet created |
-| Supabase | ? | ❌ | Need `DATABASE_URL` before Phase 1 can run |
+| GitHub | ✅ | n/a | https://github.com/We-the-Politicians-TN/tn-accountability (public). Remote added locally. **Push blocked** — see Blockers. |
+| Supabase | in progress | ❌ | Org "We the Politicians TN", Free plan. Need `DATABASE_URL` before Phase 1 can run. Free tier will not hold Phase 2 — see D13. |
 | LegiScan | ? | ❌ | Need `LEGISCAN_API_KEY` before Phase 3 |
 | Accountability Project | ? | n/a | MuckRock login; manual download in Phase 2 |
 | Cloudflare | ? | ❌ | Not needed until Phase 8 |
@@ -83,13 +85,13 @@ Nothing yet. Phase 0 verification steps are in `PLAN.md` line 31.
 
 ## Blockers
 
-- **`gh` CLI not installed**, so the repo cannot be created from this machine
-  programmatically. Either install it (`brew install gh`, which first needs
-  Homebrew) or create the repo in the GitHub web UI and run:
-  ```
-  git remote add origin https://github.com/<user>/tn-accountability.git
-  git push -u origin main
-  ```
+- **Push to GitHub is denied.** Repo exists and `origin` is set, but the stored git
+  credential is for GitHub user `Wayfarerint-coder`, which is not a member of the
+  `We-the-Politicians-TN` org:
+  `remote: Permission to We-the-Politicians-TN/tn-accountability.git denied to Wayfarerint-coder` (403).
+  Fix: grant that account write access to the repo or the org, then
+  `git push -u origin main`. (`gh` CLI is also not installed on this machine.)
+- **Supabase Free tier is ~3x too small for Phase 2.** Not blocking yet; see D13.
 - **No Supabase `DATABASE_URL`.** Phase 1's migration is written but **not applied
   and not validated** — there is no Postgres on this machine (no psql, no Docker),
   so the SQL has never been parsed by a database. First apply may surface errors.
@@ -114,4 +116,10 @@ Newest first. One entry per session.
   (plain-English description of how the tables connect).
 - **Not verified:** nothing pushed to GitHub (`gh` missing); the migration SQL has
   never been run against any Postgres instance.
-- **Next:** push to GitHub; get `DATABASE_URL`; apply the migration.
+- **Next:** resolve the GitHub push permission; get `DATABASE_URL`; apply the migration.
+
+### 2026-09-13 (later) — GitHub remote + Supabase plan decision
+
+- Recorded repo URL, added `origin`, attempted push — denied (403, wrong account).
+- Verified Supabase Free vs Pro limits against supabase.com/pricing. Recorded D13/D14.
+- No code changes.
