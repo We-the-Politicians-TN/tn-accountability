@@ -12,7 +12,8 @@ append to the Session log and add any new entries to Decisions.
 
 ## Current phase
 
-**Phase 0 — complete locally**, GitHub push pending (see Blockers).
+**Phase 0 — COMPLETE and verified.** Repo public at
+https://github.com/We-the-Politicians-TN/tn-accountability, `.env` confirmed absent.
 **Phase 1 — schema written, NOT applied.** Blocked on `DATABASE_URL`.
 
 ---
@@ -37,7 +38,10 @@ reversed, add a new entry that says so and why.
 | D11 | 2026-09-13 | Partial unique index on `(source_file, source_record_id)` for contributions and expenditures. | Makes re-ingest idempotent for rows that carry a source identifier. Rows without one still need application-level dedupe — open risk for Phase 7. |
 | D12 | 2026-09-13 | Migrations are append-only, tracked in `schema_migrations` with a SHA-256 of each file. | An applied migration that gets edited is a silent drift bug; the runner refuses to continue if a hash changes. |
 | D13 | 2026-09-13 | Start Supabase on the Free plan despite knowing it is too small for the full Phase 2 backfill. | Free gives 500 MB (verified on supabase.com/pricing). Estimated need is 1.2-1.5 GB for ~2.0M contributions + ~480K expenditures with raw+normalized columns and six indexes on `contributions` — roughly 3x over. But Free costs nothing, Phase 1 fits, and Phase 2 will produce a real bytes-per-row measurement. Upgrade to Pro ($25/mo, 8 GB, then $0.125/GB) when measured, not on an estimate. **Before upgrading, ask Supabase about nonprofit/open-source credits** — the repo is public and the org is a civic project. |
-| D14 | 2026-09-13 | Supabase org named "We the Politicians TN", type Personal. | Matches the GitHub org `We-the-Politicians-TN`. Supabase's org "type" is segmentation metadata only — it does not affect features or billing — so it is not worth agonizing over and is changeable later. |
+| D14 | 2026-09-13 | Supabase org named "We the Politicians TN", type Personal. | Matches the GitHub account `We-the-Politicians-TN`. Supabase's org "type" is segmentation metadata only — it does not affect features or billing — so it is not worth agonizing over and is changeable later. |
+| D15 | 2026-09-13 | Push over SSH with a dedicated passphrase-less key `~/.ssh/id_ed25519_github`, pinned in `~/.ssh/config` with `IdentitiesOnly yes`. | The pre-existing `~/.ssh/id_ed25519` is passphrase-protected and its passphrase is not recoverable, so it cannot sign unattended — GitHub accepted the key but SSH could not use it. A separate key leaves the original untouched for other hosts. `IdentitiesOnly yes` stops SSH offering the old key first. |
+| D16 | 2026-09-13 | Commits are authored as `We the Politicians TN <42594056+We-the-Politicians-TN@users.noreply.github.com>`, set per-repo. | Commit history on a public repo about named politicians is permanently public and scraped; the maintainer's personal email should not be in it. The three pre-push commits were rewritten with `filter-branch` and the `refs/original/` backups deleted, so no personal address is reachable. |
+| D17 | 2026-09-13 | GitHub account `Wayfarerint-coder` is NOT used for this project. | User's explicit instruction. Its credential still sits in the macOS keychain for github.com; the SSH config bypasses it entirely. |
 
 ---
 
@@ -58,7 +62,7 @@ Things discovered about this machine/accounts that are expensive to rediscover.
 
 | Service | Account created | Credential in `.env` | Notes |
 |---|---|---|---|
-| GitHub | ✅ | n/a | https://github.com/We-the-Politicians-TN/tn-accountability (public). Remote added locally. **Push blocked** — see Blockers. |
+| GitHub | ✅ | n/a | https://github.com/We-the-Politicians-TN/tn-accountability — public, pushed, verified. Account is a personal account, not an org. |
 | Supabase | in progress | ❌ | Org "We the Politicians TN", Free plan. Need `DATABASE_URL` before Phase 1 can run. Free tier will not hold Phase 2 — see D13. |
 | LegiScan | ? | ❌ | Need `LEGISCAN_API_KEY` before Phase 3 |
 | Accountability Project | ? | n/a | MuckRock login; manual download in Phase 2 |
@@ -68,29 +72,24 @@ Things discovered about this machine/accounts that are expensive to rediscover.
 
 ## Verified by a human
 
-Nothing yet. Phase 0 verification steps are in `PLAN.md` line 31.
+- **Phase 0 (PLAN.md line 31):** repo is public on GitHub with the expected files;
+  `.env` returns 404 on the GitHub API, confirming it was never pushed; `.gitignore`
+  lists `.env`. Verified 2026-09-13.
 
 ---
 
 ## Next
 
-1. Create the public GitHub repo `tn-accountability` and push (see Blockers).
-2. Confirm Phase 0 verification: repo visible on GitHub, `.env` absent from it.
-3. Apply the Phase 1 migration once `DATABASE_URL` is in `.env`:
+1. Apply the Phase 1 migration once `DATABASE_URL` is in `.env`:
    `source .venv/bin/activate && PYTHONPATH=src python -m tn_accountability.migrate`
    **The SQL has never been executed** — expect to fix syntax errors on first run.
-4. Verify in Supabase Table Editor that all tables exist, then Phase 2 backfill.
+2. Verify in Supabase Table Editor that all tables exist, then Phase 2 backfill.
 
 ---
 
 ## Blockers
 
-- **Push to GitHub is denied.** Repo exists and `origin` is set, but the stored git
-  credential is for GitHub user `Wayfarerint-coder`, which is not a member of the
-  `We-the-Politicians-TN` org:
-  `remote: Permission to We-the-Politicians-TN/tn-accountability.git denied to Wayfarerint-coder` (403).
-  Fix: grant that account write access to the repo or the org, then
-  `git push -u origin main`. (`gh` CLI is also not installed on this machine.)
+- **RESOLVED** — GitHub push. See D15/D16.
 - **Supabase Free tier is ~3x too small for Phase 2.** Not blocking yet; see D13.
 - **No Supabase `DATABASE_URL`.** Phase 1's migration is written but **not applied
   and not validated** — there is no Postgres on this machine (no psql, no Docker),
@@ -118,8 +117,15 @@ Newest first. One entry per session.
   never been run against any Postgres instance.
 - **Next:** resolve the GitHub push permission; get `DATABASE_URL`; apply the migration.
 
-### 2026-09-13 (later) — GitHub remote + Supabase plan decision
+### 2026-09-13 (later) — GitHub auth resolved, Phase 0 pushed and verified
 
-- Recorded repo URL, added `origin`, attempted push — denied (403, wrong account).
-- Verified Supabase Free vs Pro limits against supabase.com/pricing. Recorded D13/D14.
-- No code changes.
+- Push initially denied: keychain credential was `Wayfarerint-coder` (not used, per D17).
+- Switched `origin` to SSH. First key failed because it is passphrase-protected and
+  the agent was empty — GitHub logged "Server accepts key" then "No more authentication
+  methods to try". Generated `~/.ssh/id_ed25519_github` without a passphrase (D15).
+- Consolidated `~/.ssh/config`, which had accumulated three conflicting `Host github.com`
+  blocks; SSH is first-match-wins so the old key was still winning. Backup at
+  `~/.ssh/config.bak-*`.
+- Rewrote the three commits to the noreply identity and deleted `refs/original/` (D16).
+- Pushed. **Verified:** repo public, expected files present, `.env` returns 404.
+- Verified Supabase Free vs Pro limits against supabase.com/pricing (D13/D14).
