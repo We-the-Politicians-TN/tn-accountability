@@ -1,0 +1,13 @@
+# Core ingest + analysis. Pinned loosely; run `pip freeze > requirements.lock.txt`
+# when you want an exact reproducible set.
+
+python-dotenv>=1.0          # loads .env
+psycopg[binary]>=3.1        # Postgres driver (Supabase)
+sqlalchemy>=2.0             # connection/engine handling for bulk loads
+requests>=2.31              # LegiScan API, file downloads
+pandas>=2.0                 # CSV wrangling for the backfill
+rapidfuzz>=3.0              # name matching (Phase 4: legislators <-> TREF candidates)
+
+# Dev
+pytest>=8.0
+ruff>=0.5

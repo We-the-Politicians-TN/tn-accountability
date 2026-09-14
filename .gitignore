@@ -1,0 +1,70 @@
+# ---------------------------------------------------------------------------
+# Secrets — never commit these. Real credentials live in .env (local only).
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+service-account*.json
+
+# ---------------------------------------------------------------------------
+# Raw + processed data. These are the evidence trail: they stay on disk and in
+# backups, never in git. Accountability Project TN files alone are ~2M rows.
+# Directory structure is preserved via .gitkeep files.
+# ---------------------------------------------------------------------------
+data/raw/**
+data/processed/**
+# Re-include directories so git can descend into them and see the .gitkeep files
+# below; a negation cannot rescue a file inside an excluded directory.
+!data/raw/**/
+!data/processed/**/
+!data/**/.gitkeep
+!data/**/README.md
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.parquet
+*.zip
+*.gz
+*.7z
+*.sqlite
+*.db
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# Node / Evidence site (Phase 8)
+# ---------------------------------------------------------------------------
+node_modules/
+.evidence/
+.svelte-kit/
+.wrangler/
+dist/
+
+# ---------------------------------------------------------------------------
+# OS + editor
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
