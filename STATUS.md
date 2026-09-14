@@ -14,7 +14,8 @@ append to the Session log and add any new entries to Decisions.
 
 **Phase 0 — COMPLETE and verified.** Repo public at
 https://github.com/We-the-Politicians-TN/tn-accountability, `.env` confirmed absent.
-**Phase 1 — schema written, NOT applied.** Blocked on `DATABASE_URL`.
+**Phase 1 — COMPLETE.** Schema applied to Supabase and functionally verified.
+Next: Phase 2 historical backfill.
 
 ---
 
@@ -42,6 +43,9 @@ reversed, add a new entry that says so and why.
 | D15 | 2026-09-13 | Push over SSH with a dedicated passphrase-less key `~/.ssh/id_ed25519_github`, pinned in `~/.ssh/config` with `IdentitiesOnly yes`. | The pre-existing `~/.ssh/id_ed25519` is passphrase-protected and its passphrase is not recoverable, so it cannot sign unattended — GitHub accepted the key but SSH could not use it. A separate key leaves the original untouched for other hosts. `IdentitiesOnly yes` stops SSH offering the old key first. |
 | D16 | 2026-09-13 | Commits are authored as `We the Politicians TN <42594056+We-the-Politicians-TN@users.noreply.github.com>`, set per-repo. | Commit history on a public repo about named politicians is permanently public and scraped; the maintainer's personal email should not be in it. The three pre-push commits were rewritten with `filter-branch` and the `refs/original/` backups deleted, so no personal address is reachable. |
 | D17 | 2026-09-13 | GitHub account `Wayfarerint-coder` is NOT used for this project. | User's explicit instruction. Its credential still sits in the macOS keychain for github.com; the SSH config bypasses it entirely. |
+| D18 | 2026-09-13 | `DATABASE_URL` must use the **session pooler**, never the direct connection. | Verified empirically: `db.zrtmstikjixpuqtorhfj.supabase.co` has an AAAA record and **no A record**, and connecting failed with "failed to resolve host". The pooler host `aws-0-us-east-1.pooler.supabase.com` resolves to IPv4 and connects. Same constraint will apply to GitHub Actions runners in Phase 7. |
+| D19 | 2026-09-13 | The database password contains characters that must be percent-encoded in the URL (it has an `@`). | An unencoded `@` makes `urlparse` read the password as the hostname. If the password is ever rotated, re-encode it — `urllib.parse.quote(pwd, safe='')`. Encoding expanded 38 chars to 56. |
+| D20 | 2026-09-13 | `.env` is `chmod 600`. | Was `644`, world-readable on a multi-user machine. Disk is FileVault-encrypted and the project is not in a cloud-synced folder, so this closes the remaining local exposure. |
 
 ---
 
@@ -63,7 +67,7 @@ Things discovered about this machine/accounts that are expensive to rediscover.
 | Service | Account created | Credential in `.env` | Notes |
 |---|---|---|---|
 | GitHub | ✅ | n/a | https://github.com/We-the-Politicians-TN/tn-accountability — public, pushed, verified. Account is a personal account, not an org. |
-| Supabase | in progress | ❌ | Org "We the Politicians TN", Free plan. Need `DATABASE_URL` before Phase 1 can run. Free tier will not hold Phase 2 — see D13. |
+| Supabase | ✅ | ✅ | Project ref `zrtmstikjixpuqtorhfj`, region us-east-1, PostgreSQL 17.6, Free plan. Connects via session pooler. Free tier will not hold Phase 2 — see D13. |
 | LegiScan | ? | ❌ | Need `LEGISCAN_API_KEY` before Phase 3 |
 | Accountability Project | ? | n/a | MuckRock login; manual download in Phase 2 |
 | Cloudflare | ? | ❌ | Not needed until Phase 8 |
@@ -75,21 +79,31 @@ Things discovered about this machine/accounts that are expensive to rediscover.
 - **Phase 0 (PLAN.md line 31):** repo is public on GitHub with the expected files;
   `.env` returns 404 on the GitHub API, confirming it was never pushed; `.gitignore`
   lists `.env`. Verified 2026-09-13.
+- **Phase 1 (PLAN.md line 39):** schema applied to Supabase. Queried the live database:
+  13 project tables + `schema_migrations`, 5 enum types, 52 indexes, 25 foreign keys,
+  8 triggers. Functional test confirmed the legislator↔contribution join works, that a
+  contribution without `data_pull_id` is rejected, that a term ending before it starts
+  is rejected, and that `legislator_tref_ids.approved` defaults to false. Test rolled
+  back; database left empty. **Still to do by a human:** eyeball the tables in the
+  Supabase Table Editor.
 
 ---
 
 ## Next
 
-1. Apply the Phase 1 migration once `DATABASE_URL` is in `.env`:
-   `source .venv/bin/activate && PYTHONPATH=src python -m tn_accountability.migrate`
-   **The SQL has never been executed** — expect to fix syntax errors on first run.
-2. Verify in Supabase Table Editor that all tables exist, then Phase 2 backfill.
+1. Look at the tables in the Supabase Table Editor to close out Phase 1 verification.
+2. **Phase 2 — historical backfill.** Requires a manual download first: get the
+   Tennessee contributions and expenditures files from publicaccountability.org
+   (MuckRock login) into `data/raw/accountability_project/`. Do not rename them.
+3. Expect the Free tier's 500 MB limit to bite during Phase 2 (D13). Measure actual
+   bytes/row on a partial load before deciding whether to upgrade.
 
 ---
 
 ## Blockers
 
 - **RESOLVED** — GitHub push. See D15/D16.
+- **RESOLVED** — Supabase connection. See D18/D19.
 - **Supabase Free tier is ~3x too small for Phase 2.** Not blocking yet; see D13.
 - **No Supabase `DATABASE_URL`.** Phase 1's migration is written but **not applied
   and not validated** — there is no Postgres on this machine (no psql, no Docker),
@@ -116,6 +130,19 @@ Newest first. One entry per session.
 - **Not verified:** nothing pushed to GitHub (`gh` missing); the migration SQL has
   never been run against any Postgres instance.
 - **Next:** resolve the GitHub push permission; get `DATABASE_URL`; apply the migration.
+
+### 2026-09-13 (later still) — Phase 1 applied and verified
+
+- Diagnosed two problems with the pasted connection string: the password contains an
+  `@` (broke URL parsing) and the string was the direct connection, which is IPv6-only
+  and unreachable from this network. Percent-encoded the password in place and rewrote
+  the URL to the session pooler. See D18/D19.
+- Applied `0001_initial_schema.sql` — succeeded on the first run, no syntax errors.
+- **Verified against the live database**, not just the runner's exit code: table/column
+  counts, enum values, index/FK/trigger counts, and a functional insert-join-rollback
+  test exercising the NOT NULL provenance constraint, the term date check, and the
+  `approved` default.
+- **Next:** Phase 2 backfill — blocked on the manual Accountability Project download.
 
 ### 2026-09-13 (later) — GitHub auth resolved, Phase 0 pushed and verified
 
