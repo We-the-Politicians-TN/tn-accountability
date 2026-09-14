@@ -45,7 +45,16 @@ reversed, add a new entry that says so and why.
 | D17 | 2026-09-13 | GitHub account `Wayfarerint-coder` is NOT used for this project. | User's explicit instruction. Its credential still sits in the macOS keychain for github.com; the SSH config bypasses it entirely. |
 | D18 | 2026-09-13 | `DATABASE_URL` must use the **session pooler**, never the direct connection. | Verified empirically: `db.zrtmstikjixpuqtorhfj.supabase.co` has an AAAA record and **no A record**, and connecting failed with "failed to resolve host". The pooler host `aws-0-us-east-1.pooler.supabase.com` resolves to IPv4 and connects. Same constraint will apply to GitHub Actions runners in Phase 7. |
 | D19 | 2026-09-13 | The database password contains characters that must be percent-encoded in the URL (it has an `@`). | An unencoded `@` makes `urlparse` read the password as the hostname. If the password is ever rotated, re-encode it — `urllib.parse.quote(pwd, safe='')`. Encoding expanded 38 chars to 56. |
-| D20 | 2026-09-13 | `.env` is `chmod 600`. | Was `644`, world-readable on a multi-user machine. Disk is FileVault-encrypted and the project is not in a cloud-synced folder, so this closes the remaining local exposure. |
+| D20 | 2026-09-13 | **PLAN.md Phase 2 as written is not achievable.** The Accountability Project caps downloads at 10,000 rows. | Verified on publicaccountability.org/search-guide/: "Downloads are capped at 10,000 rows. If you are looking for more data than this, please contact us." The TN contributions dataset is 2,027,069 rows — the cap is 0.5% of it. There is no bulk download button on the dataset page; the only download is on the Dataset Search page and is subject to the cap. Bulk access requires contacting them. |
+| D21 | 2026-09-13 | TAP's own data is stale: TN contributions cover **2002–2023**, expenditures **2004–2023**. | It is 2026. Even a successful bulk request from TAP leaves a ~3-year gap that must be filled from TREF regardless. |
+| D22 | 2026-09-13 | TAP built their TN dataset by scraping TREF directly — their script is a working blueprint. | `state/tn/contribs/docs/get_tn_contribs.R` in irworkshop/accountability_datacleaning POSTs to `https://apps.tn.gov/tncamp-app/public/cesearch.htm` per year, reads the CSV link from `ceresults.htm`, and pages via `ceresultsnext.htm`. This means PLAN.md Phase 2 (bulk download) and Phase 7 (TREF scraper) are really the same piece of work, and the primary source has no row cap and is current. |
+| D24 | 2026-09-13 | Phase 2 pivots to scraping TREF directly; the TAP request goes out in parallel but nothing waits on it. | User decision. TREF is the primary source, has no row cap, and is current — TAP's copy stops at 2023. The scraper is required for Phase 7 anyway, so this is not extra work, it is the same work done earlier. |
+| D25 | 2026-09-13 | **The TREF app moved from `/tncamp-app/` to `/tncamp/`.** | `https://apps.tn.gov/tncamp-app/public/cesearch.htm` now 302-redirects. TAP's `get_tn_contribs.R` would silently fail against the old path. All form field names are unchanged, so only the base URL needed updating. |
+| D26 | 2026-09-13 | Parse results from the POST response directly; skip the separate `GET ceresults.htm`. | The POST redirects to `ceresults.htm`, so its body already *is* batch 1. The extra GET was a wasted request and was where the intermittent TLS failures kept landing. |
+| D27 | 2026-09-13 | The CSV export returns the **entire current batch**, not the 50 rows displayed. | Verified: a page reading "754 results found, displaying 1 to 50" exported 755 lines. Batch sizes vary (~750-810 observed), so row totals must be counted from the files, never taken from the page banner. |
+| D28 | 2026-09-13 | Every TREF request is wrapped in retry-with-backoff. | `apps.tn.gov` intermittently drops TLS handshakes (`SSLEOFError: EOF occurred in violation of protocol`). Five consecutive CSV fetches then succeeded, so it is transient — but across a backfill of thousands of requests it is a certainty. Aggravated by system Python 3.9 linking **LibreSSL 2.8.3**; see D4. |
+| D29 | 2026-09-13 | Measured TREF throughput: **~6 batches/min, ~4,500 rows/min**, ~190 bytes per CSV row. | Implies roughly **9-10 hours of continuous scraping** for the full ~2.5M-row backfill, and ~475 MB of raw CSV on disk. The backfill must be resumable and run unattended; it cannot be a single foreground session. |
+| D23 | 2026-09-13 | `.env` is `chmod 600`. | Was `644`, world-readable on a multi-user machine. Disk is FileVault-encrypted and the project is not in a cloud-synced folder, so this closes the remaining local exposure. |
 
 ---
 
@@ -92,9 +101,9 @@ Things discovered about this machine/accounts that are expensive to rediscover.
 ## Next
 
 1. Look at the tables in the Supabase Table Editor to close out Phase 1 verification.
-2. **Phase 2 — historical backfill.** Requires a manual download first: get the
-   Tennessee contributions and expenditures files from publicaccountability.org
-   (MuckRock login) into `data/raw/accountability_project/`. Do not rename them.
+2. **Phase 2 — BLOCKED as written.** The TAP download cap (D20) means the files
+   PLAN.md assumes cannot be obtained that way. Decision pending: request bulk access
+   from TAP, scrape TREF directly (D22), or both.
 3. Expect the Free tier's 500 MB limit to bite during Phase 2 (D13). Measure actual
    bytes/row on a partial load before deciding whether to upgrade.
 
