@@ -12,7 +12,8 @@ append to the Session log and add any new entries to Decisions.
 
 ## Current phase
 
-**Phase 0 — Accounts and workspace.** Scaffold complete locally; GitHub push pending.
+**Phase 0 — complete locally**, GitHub push pending (see Blockers).
+**Phase 1 — schema written, NOT applied.** Blocked on `DATABASE_URL`.
 
 ---
 
@@ -29,6 +30,12 @@ reversed, add a new entry that says so and why.
 | D4 | 2026-09-13 | Scaffolded on system Python 3.9.6. | Only Python on the machine; no Homebrew installed. Works for current deps (pandas 2.3.3, psycopg 3.2.13 all installed cleanly). **Revisit before Phase 7** — 3.9 is EOL as of Oct 2025 and Playwright/newer pandas will eventually require 3.11+. Swapping the venv is a one-command change. |
 | D5 | 2026-09-13 | Secrets live only in `.env`, loaded via `python-dotenv`; `.env.example` documents every variable. | Keeps credentials out of a public repo. CI (Phase 7) will supply the same names as GitHub Actions secrets; Cloudflare (Phase 8) as environment variables. |
 | D6 | 2026-09-13 | `DATABASE_URL` uses Supabase's session pooler (port 5432), not the direct connection. | Direct connections are IPv6-only on Supabase free tier; the pooler works from GitHub Actions runners and most home networks. |
+| D7 | 2026-09-13 | Terms and TREF candidate IDs are separate tables (`legislator_terms`, `legislator_tref_ids`), not columns on `legislators`. | PLAN.md asks for "terms served with start/end dates" and "TREF candidate IDs — a legislator can have several". Both are one-to-many. |
+| D8 | 2026-09-13 | `legislator_tref_ids.approved` defaults to false; analysis views must filter on it. | Phase 4 requires human sign-off on matches below 90% confidence. Enforcing it in the schema means an unapproved guess cannot silently reach a published figure. |
+| D9 | 2026-09-13 | Roll calls split into `roll_calls` (the vote event, with totals) + `votes` (per-legislator). | PLAN.md says `votes` (bill, roll call, legislator, vote cast). A roll call has its own date, chamber, and tallies that would otherwise repeat on every vote row. |
+| D10 | 2026-09-13 | `contribution_date_raw` and `amount_raw` are `text`, kept alongside parsed values. | A source value that fails to parse is preserved as evidence rather than dropped. Applies the PLAN.md rule that every table keeps raw alongside cleaned. |
+| D11 | 2026-09-13 | Partial unique index on `(source_file, source_record_id)` for contributions and expenditures. | Makes re-ingest idempotent for rows that carry a source identifier. Rows without one still need application-level dedupe — open risk for Phase 7. |
+| D12 | 2026-09-13 | Migrations are append-only, tracked in `schema_migrations` with a SHA-256 of each file. | An applied migration that gets edited is a silent drift bug; the runner refuses to continue if a hash changes. |
 
 ---
 
@@ -67,7 +74,10 @@ Nothing yet. Phase 0 verification steps are in `PLAN.md` line 31.
 
 1. Create the public GitHub repo `tn-accountability` and push (see Blockers).
 2. Confirm Phase 0 verification: repo visible on GitHub, `.env` absent from it.
-3. Phase 1 — write and apply the Postgres schema migration. Blocked on `DATABASE_URL`.
+3. Apply the Phase 1 migration once `DATABASE_URL` is in `.env`:
+   `source .venv/bin/activate && PYTHONPATH=src python -m tn_accountability.migrate`
+   **The SQL has never been executed** — expect to fix syntax errors on first run.
+4. Verify in Supabase Table Editor that all tables exist, then Phase 2 backfill.
 
 ---
 
@@ -80,8 +90,9 @@ Nothing yet. Phase 0 verification steps are in `PLAN.md` line 31.
   git remote add origin https://github.com/<user>/tn-accountability.git
   git push -u origin main
   ```
-- **No Supabase `DATABASE_URL`.** Phase 1's migration can be *written* without it
-  but not *applied*.
+- **No Supabase `DATABASE_URL`.** Phase 1's migration is written but **not applied
+  and not validated** — there is no Postgres on this machine (no psql, no Docker),
+  so the SQL has never been parsed by a database. First apply may surface errors.
 - **No `LEGISCAN_API_KEY`.** Required for Phase 3.
 
 ---
@@ -90,7 +101,7 @@ Nothing yet. Phase 0 verification steps are in `PLAN.md` line 31.
 
 Newest first. One entry per session.
 
-### 2026-09-13 — Phase 0 scaffold
+### 2026-09-13 — Phase 0 scaffold + Phase 1 schema (unapplied)
 
 - Created directory structure, `git init` on `main`.
 - Wrote `.gitignore` (secrets + large data excluded), `.env.example`, `README.md`,
@@ -98,5 +109,9 @@ Newest first. One entry per session.
 - Created `.venv` on Python 3.9.6 and installed dependencies.
 - **Verified:** `git check-ignore .env` confirms `.env` is ignored; `git status`
   shows no data or secret files staged.
-- **Not verified:** nothing pushed to GitHub yet (`gh` missing).
-- **Next:** push to GitHub, then Phase 1 schema.
+- Wrote `sql/migrations/0001_initial_schema.sql` (13 tables, 5 enum types),
+  `src/tn_accountability/migrate.py` (migration runner), and `docs/schema.md`
+  (plain-English description of how the tables connect).
+- **Not verified:** nothing pushed to GitHub (`gh` missing); the migration SQL has
+  never been run against any Postgres instance.
+- **Next:** push to GitHub; get `DATABASE_URL`; apply the migration.
