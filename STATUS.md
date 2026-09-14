@@ -56,6 +56,11 @@ reversed, add a new entry that says so and why.
 | D29 | 2026-09-13 | Measured TREF throughput: **~6 batches/min, ~4,500 rows/min**, ~190 bytes per CSV row. | Implies roughly **9-10 hours of continuous scraping** for the full ~2.5M-row backfill, and ~475 MB of raw CSV on disk. The backfill must be resumable and run unattended; it cannot be a single foreground session. |
 | D30 | 2026-09-13 | Ask **TREF directly** (registry.info@tn.gov) for a bulk extract, not just TAP. | TREF is the primary source and is current; TAP is a third-party copy that stops at 2023. A single extract may also expose fields the web export does not. Drafted in `docs/tref_bulk_request.md`. |
 | D31 | 2026-09-13 | Neither bulk request blocks the scraper; all three run in parallel. | Phase 7 needs ongoing TREF ingest regardless, so the scraper is never wasted work. Agency requests can stall for weeks, and stopping the scraper to wait would risk losing that time for nothing. |
+| D32 | 2026-09-13 | Backfill writes to `data/raw/tref/backfill/<type>/<year>/`, not a dated directory. | Resume needs a stable path. A year is complete when it holds `_manifest.json`; reruns skip it. Dated directories stay for Phase 7 incremental pulls, where "what arrived on this date" is the meaningful grouping. |
+| D33 | 2026-09-13 | An interrupted year is discarded and re-fetched, not resumed mid-way. | TREF's paging cursor lives in a server-side session that cannot be re-entered. Downloads go to `<year>.partial/` and are renamed to `<year>/` only on success, so a completed year is never torn or overwritten. `.partial` directories are working state, not evidence — the never-delete-raw-data rule does not apply to them. |
+| D34 | 2026-09-13 | The manifest records a SHA-256 per file. | Lets the evidence trail be re-verified later without re-downloading, and catches silent corruption. Verified working: 32/32 files matched on re-check. |
+| D35 | 2026-09-13 | A failed year logs and continues rather than aborting the run. | An overnight backfill must not lose nine good hours to one bad year. Failures are listed at the end and rerunning the same command retries only those. |
+| D36 | 2026-09-13 | **Supabase security confirmed safe by default:** RLS is enabled on all 14 tables with no policies (deny-all), and `anon` holds no SELECT/INSERT/UPDATE/DELETE. | Checked directly, not assumed. Means loaded data is unreadable through the public API until policies are deliberately added. **Phase 8 will have to add read policies** for the public site — that is intended, but it is the moment to get it right. |
 | D23 | 2026-09-13 | `.env` is `chmod 600`. | Was `644`, world-readable on a multi-user machine. Disk is FileVault-encrypted and the project is not in a cloud-synced folder, so this closes the remaining local exposure. |
 
 ---
@@ -103,11 +108,14 @@ Things discovered about this machine/accounts that are expensive to rediscover.
 ## Next
 
 1. Look at the tables in the Supabase Table Editor to close out Phase 1 verification.
-2. **Phase 2 — BLOCKED as written.** The TAP download cap (D20) means the files
-   PLAN.md assumes cannot be obtained that way. Decision pending: request bulk access
-   from TAP, scrape TREF directly (D22), or both.
-3. Expect the Free tier's 500 MB limit to bite during Phase 2 (D13). Measure actual
-   bytes/row on a partial load before deciding whether to upgrade.
+2. **Phase 2 — collection solved, loading not started.** The backfill CLI works
+   (`python -m tn_accountability.backfill --years 2019-2026`). Verified end to end on
+   expenditures 2026: 26,765 rows, 32 batches, 3.8 MB, 215s, all checksums matching,
+   and a rerun correctly skipped the completed year.
+   **Not built yet: the loader from raw CSV into Postgres.** The database is still empty.
+3. Send the two bulk requests (`docs/tref_bulk_request.md`, `docs/tap_bulk_request.md`).
+4. Resolve Supabase capacity (D13) before any large load — 500 MB will not hold it.
+
 
 ---
 

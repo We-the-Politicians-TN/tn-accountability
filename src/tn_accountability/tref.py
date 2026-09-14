@@ -233,9 +233,15 @@ class TrefClient:
         page = _parse_results(post.text)
 
         if page.csv_url is None:
+            # A year with no matching records has no export link. Distinguish that
+            # from a layout change by checking whether the page reported a count:
+            # "0 results found" is an empty year, a missing banner is a broken parse.
+            if page.row_count == 0:
+                return result
             raise TrefError(
-                f"no CSV export link found for {search_type} {year}. "
-                "The site layout may have changed — see docs/tref_scraper.md."
+                f"no CSV export link found for {search_type} {year} "
+                f"(reported row count: {page.row_count}). The site layout may have "
+                "changed — re-check the selectors in _parse_results()."
             )
 
         for page_no in range(1, MAX_PAGES_PER_YEAR + 1):
