@@ -27,6 +27,7 @@ modified afterward. They are the evidence trail.
 
 from __future__ import annotations
 
+import hashlib
 import random
 import re
 import time
@@ -55,7 +56,12 @@ PAGE_DELAY = (1.0, 3.0)
 YEAR_DELAY = (10.0, 30.0)
 
 # Guard against an unbounded loop if the "More" button never disappears.
-MAX_PAGES_PER_YEAR = 500
+# A page cap cannot distinguish a genuinely large year from an infinite loop.
+# 2023 tripped the old cap of 500 with 500 *distinct* pages, because TREF served
+# ~346 rows/page that year against ~800-890 for other years. The real loop signal
+# is the same page arriving twice, which is checked separately below; this cap is
+# now only a last-resort stop.
+MAX_PAGES_PER_YEAR = 5000
 
 
 class TrefError(RuntimeError):
@@ -244,6 +250,11 @@ class TrefClient:
                 "changed — re-check the selectors in _parse_results()."
             )
 
+        # Real loop detection: if the server hands back a page we have already
+        # downloaded, the cursor is not advancing. Comparing content is reliable
+        # where counting pages is not.
+        seen_digests = set()
+
         for page_no in range(1, MAX_PAGES_PER_YEAR + 1):
             if page.row_count:
                 result.row_count_reported += page.row_count
@@ -270,6 +281,16 @@ class TrefClient:
                 tmp.replace(path)
 
             self._retrying(_download, f"csv {search_type} {year} batch {page_no}")
+
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            if digest in seen_digests:
+                path.unlink()
+                raise TrefError(
+                    f"{search_type} {year}: batch {page_no} is byte-identical to a page "
+                    f"already downloaded. The 'More' cursor is not advancing, so this "
+                    f"would loop forever. Stopping with {len(result.files)} good batches."
+                )
+            seen_digests.add(digest)
             result.files.append(path)
 
             if not page.has_more:
