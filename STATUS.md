@@ -144,6 +144,11 @@ reversed, add a new entry that says so and why.
 | D75 | 2026-09-20 | Baseline established: House median $258,832 (n=96), Senate median $569,306 (n=34). **Garrett is 1.81x his chamber median — above median but sharing that band with 14 others.** | On fundraising volume alone he is not an outlier. This is exactly why the baseline must exist before any figure is published. |
 | D76 | 2026-09-20 | Party ratios differ (R mean 1.19, D mean 0.98) and **this should be published, not omitted**. | Republicans hold both majorities and the leadership positions that attract money. The method is party-blind and both extremes contain both parties (Sexton R 6.38x, Freeman D 3.92x at the top; Hardaway D 0.03x, Fritts R 0.18x at the bottom). Stating the difference and showing the method does not cause it is stronger than leaving a reader to wonder. |
 | D77 | 2026-09-20 | **`passed_date` is present for only 3,958 of 5,925 passed 114th-GA bills**, so the post-passage measure returns zero for most. | Derived by scanning LegiScan history text for 'signed by governor' / 'public chapter', which misses other routes to passage. Must be improved before the post-passage measure is published. |
+| D78 | 2026-09-20 | **36% of bills are ceremonial and must be excluded from every analysis.** `bills.is_ceremonial` flags 13,730 of 38,613. | Memorial resolutions honour retiring teachers and winning ball teams: no policy content, so pairing one with a donor's industry is meaningless and publishing such a pairing about a named legislator would be indefensible. Split is almost exactly by bill type — type B 0% ceremonial, JR 92%, R 95%. Also inflates apparent activity: chamber mean falls from 68.9 primary sponsorships to 43.0 substantive, and 75 of Garrett's 206 are memorials. |
+| D79 | 2026-09-20 | Regex industry rules use **prefix matching (leading `\b` only)**. | The first version used `\bBANK\b`, whose trailing boundary cannot match "BANKERS". That silently dropped Tennessee Bankers Assn PAC, Tennessee Realtors PAC, Lawyers Involved for TN and others — categorised money rose from 20.2% to 37.9% on fixing it. Watch for this whenever a rule looks correct but matches nothing. |
+| D80 | 2026-09-20 | Donor categorisation covers **56.5% of non-individual money**; $10.9M across 303 PACs remains uncategorised and is the review priority. | Individuals ($18.2M) legitimately have no industry — the employer field is 58% populated but dominated by RETIRED / SELF / NOT EMPLOYED, so it cannot rescue them. Non-individual coverage is the meaningful denominator for subject matching. |
+| D81 | 2026-09-20 | **The subject-matched signal works and behaves as Phase 5 predicted.** | For Garrett's 114th-GA bills the unrestricted pre-introduction total is near-constant (45,250 / 42,900 / 40,150 x4 — the calendar) while the subject-matched figure varies $11,000 -> $0. `f_subject_matched()` keeps both columns side by side so the calendar effect stays visible rather than hidden. |
+| D82 | 2026-09-20 | Domain **wethepoliticianstn.com** on Cloudflare; project email **wethepoliticianstn@gmail.com**. | Recorded for Phase 8 deployment and so outbound correspondence uses one address. |
 | D23 | 2026-09-13 | `.env` is `chmod 600`. | Was `644`, world-readable on a multi-user machine. Disk is FileVault-encrypted and the project is not in a cloud-synced folder, so this closes the remaining local exposure. |
 
 ---
@@ -160,6 +165,14 @@ Things discovered about this machine/accounts that are expensive to rediscover.
 - Virtualenv at `.venv/`. Activate with `source .venv/bin/activate`.
 
 ---
+
+## Domain and email
+
+- **Domain: wethepoliticianstn.com**, transferred to Cloudflare 2026-09-20; nameservers
+  propagating. This is the Phase 8 production host.
+- **Project email: wethepoliticianstn@gmail.com** — use this for all outbound project
+  correspondence (TREF, TAP, LegiScan, Ethics Commission) rather than a personal address,
+  so the record stays in one inbox.
 
 ## Accounts / credentials status
 
