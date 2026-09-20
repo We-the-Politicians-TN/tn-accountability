@@ -19,6 +19,48 @@ Next: Phase 2 historical backfill.
 
 ---
 
+## Governing principles
+
+These are not preferences. They constrain every phase and must not be traded away for
+convenience in a later one.
+
+### 1. Universal, non-partisan coverage
+
+**Every legislator gets the same treatment, of either party, whether or not anyone is
+interested in them.** The site covers all members who served — currently 207 people
+across the 111th to 114th General Assemblies, 136 of them in the current session.
+
+Johnny Garrett is the initial *test case* because an existing workbook allows the
+pipeline to be checked against independent work. He is **not** the subject of the
+project. Any analysis, threshold, view or page that works only for Garrett, or that
+would produce a different answer depending on party, is a defect.
+
+Concretely, this means:
+- Phase 4 matches **all** legislators to TREF records, not a chosen few.
+- Phase 5 computes the chamber baseline across **every** member, and each member's
+  position is expressed relative to that baseline rather than in isolation.
+- Phase 8 publishes a profile page for **every** legislator, not only flagged ones.
+- Phase 9 applies identical thresholds to everyone. No manual additions or removals
+  from the review queue.
+- Party is a displayed attribute, never an input to any threshold or ranking.
+
+**Why it matters:** the project's only real defence against a charge of bias is that
+the same method was applied to everyone and the method is published. Selective
+coverage forfeits that defence permanently, and it cannot be repaired afterwards by
+adding the missing people later.
+
+### 2. Raw data is evidence
+
+Nothing under `data/raw/` is modified, renamed, or deleted — see D2, D64. Every
+published figure traces to a source file and line via `data_pull_id`.
+
+### 3. Patterns, not accusations
+
+Neutral language throughout (PLAN.md Phase 8). The site states what the records show
+and links to them. It does not allege wrongdoing.
+
+---
+
 ## Decisions
 
 Append-only. Newest at the bottom. Never delete an entry — if a decision is
@@ -89,6 +131,7 @@ reversed, add a new entry that says so and why.
 | D62 | 2026-09-20 | **RESOLVED — the Garrett discrepancy is not ours.** capitol.tn.gov shows exactly **28** House bills for Rep. Garrett in the 114th GA, with the same bill numbers in the same order as our database (HB0032, HB0170, HB0645, HB0817, HB0818, HB0819...). | Verified against the Tennessee General Assembly's own sponsor list at `wapp.capitol.tn.gov/apps/LegislatorInfo/SponsorList?district=H450&ga=114`. **This inverts PLAN.md Phase 5's assumption**, which treats the workbook as ground truth and says to explain our differences. Here the pipeline agrees with the authoritative source and the workbook's 50 is the number needing explanation. Do not "fix" the pipeline to match the workbook. |
 | D63 | 2026-09-20 | Replaced the fixed 500-page scraper cap with **content-hash loop detection**. | 2023 tripped the cap with 500 *distinct* pages — TREF served ~346 rows/page that year versus ~800-890 for others, so a normal year looked like a runaway. A page count cannot tell a large year from an infinite loop; a byte-identical repeat can. Cap raised to 5000 as a last resort only. |
 | D64 | 2026-09-20 | Failed `.partial` download directories are **moved to `data/raw/_failed_attempts/<timestamp>/`**, never deleted. | Consistent with the never-delete-raw-data rule. They are also evidence of what the site returned during a failure, which matters if TREF's behaviour is ever questioned. |
+| D65 | 2026-09-20 | **Universal non-partisan coverage is a governing principle**, recorded in its own section above rather than as a decision row. | User's explicit direction: Garrett is the initial test case, not the focus; the site must cover all active and recent legislators of both parties equally. Verified the database already supports it: 207 people across the 111th-114th GAs (R, D and one I), 136 currently serving. Any view, threshold or page that works only for one person or differs by party is a defect. |
 | D23 | 2026-09-13 | `.env` is `chmod 600`. | Was `644`, world-readable on a multi-user machine. Disk is FileVault-encrypted and the project is not in a cloud-synced folder, so this closes the remaining local exposure. |
 
 ---
