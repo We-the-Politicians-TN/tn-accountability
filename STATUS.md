@@ -149,6 +149,11 @@ reversed, add a new entry that says so and why.
 | D80 | 2026-09-20 | Donor categorisation covers **56.5% of non-individual money**; $10.9M across 303 PACs remains uncategorised and is the review priority. | Individuals ($18.2M) legitimately have no industry — the employer field is 58% populated but dominated by RETIRED / SELF / NOT EMPLOYED, so it cannot rescue them. Non-individual coverage is the meaningful denominator for subject matching. |
 | D81 | 2026-09-20 | **The subject-matched signal works and behaves as Phase 5 predicted.** | For Garrett's 114th-GA bills the unrestricted pre-introduction total is near-constant (45,250 / 42,900 / 40,150 x4 — the calendar) while the subject-matched figure varies $11,000 -> $0. `f_subject_matched()` keeps both columns side by side so the calendar effect stays visible rather than hidden. |
 | D82 | 2026-09-20 | Domain **wethepoliticianstn.com** on Cloudflare; project email **wethepoliticianstn@gmail.com**. | Recorded for Phase 8 deployment and so outbound correspondence uses one address. |
+| D83 | 2026-09-20 | **Phase 7 does NOT use Playwright**, contrary to PLAN.md. | The existing HTTP client hits the same TREF endpoints and is proven against 1.3M rows. Playwright would add ~300 MB of browser binaries to every CI run, slower execution and a new failure mode, to reach a site that requires no JavaScript. **Revisit only if TREF moves behind a JS-rendered interface** — then Playwright becomes necessary, not optional. |
+| D84 | 2026-09-20 | **Zero rows is a failure when rows were expected** (`--expect-rows`), applied only to deadline-window schedules. | A scraper returning nothing is indistinguishable from a quiet week, and this data backs public claims about named officials. But Feb-Apr genuinely produces almost nothing because of the in-session ban (D74), so demanding rows year-round would cry wolf every spring and train everyone to ignore it. |
+| D85 | 2026-09-20 | **Download manifests are committed to git permanently**; raw CSVs are 90-day artifacts only. | CSVs are far too large for git and GitHub artifacts expire, which would leave no durable evidence trail for CI-collected data. Manifests total ~416 KB and carry a SHA-256 per file, so what was downloaded and when remains provable after artifacts are gone. |
+| D86 | 2026-09-20 | **The filing deadline dates in `docs/filing_calendar.md` are UNVERIFIED.** | No published calendar found on tn.gov/tref, and asserting unchecked statutory dates would be worse than flagging them. Confirm with the Registry (registry.info@tn.gov) — reasonable to ask alongside the bulk data request. Consequence of error is small: the weekly baseline catches any filing within 7 days, so a wrong date costs timeliness, never completeness. **In an election year, add the pre-primary and pre-general dates to the cron** — the standing quarterly windows will not cover them. |
+| D87 | 2026-09-20 | The TREF sync re-runs `match_tref propose/link` and `classify donors` after every load. | New filers and new donors appear constantly; without re-matching, a newly elected member's money stays unlinked and uncategorised until a human happens to notice. |
 | D23 | 2026-09-13 | `.env` is `chmod 600`. | Was `644`, world-readable on a multi-user machine. Disk is FileVault-encrypted and the project is not in a cloud-synced folder, so this closes the remaining local exposure. |
 
 ---
@@ -222,6 +227,19 @@ Things discovered about this machine/accounts that are expensive to rediscover.
 
 
 ---
+
+## Action required before the scheduled jobs can run
+
+Add two **repository secrets** at
+https://github.com/We-the-Politicians-TN/tn-accountability/settings/secrets/actions
+
+| Secret | Value |
+|---|---|
+| `DATABASE_URL` | The Supabase **session pooler** string (port 5432). The direct host is IPv6-only and GitHub runners cannot reach it — D18. |
+| `LEGISCAN_API_KEY` | The LegiScan key already in your Keychain. |
+
+Then trigger each workflow once by hand (Actions -> select workflow -> Run workflow)
+to confirm it works before relying on the schedule.
 
 ## Blockers
 
