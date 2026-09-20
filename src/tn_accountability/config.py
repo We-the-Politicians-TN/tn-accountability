@@ -22,14 +22,31 @@ class MissingConfig(RuntimeError):
 
 
 def require(name: str) -> str:
-    """Return an environment variable, or explain what to do if it is absent."""
+    """Return a secret, or explain what to do if it is absent.
+
+    Resolution order: environment (including .env) first, then the macOS Keychain.
+    The environment wins so that CI and one-off overrides work without touching
+    stored secrets.
+    """
     value = os.environ.get(name)
     if not value:
+        value = _from_keychain(name)
+    if not value:
         raise MissingConfig(
-            f"{name} is not set. Copy .env.example to .env and fill it in "
-            f"(see .env.example for where to find this value)."
+            f"{name} is not set. Either store it in the Keychain:\n"
+            f"    python -m tn_accountability.secrets set {name}\n"
+            f"or copy .env.example to .env and fill it in."
         )
     return value
+
+
+def _from_keychain(name: str):
+    """Look a secret up in the macOS Keychain. Returns None anywhere else."""
+    try:
+        from .secrets import get as keychain_get
+        return keychain_get(name)
+    except Exception:
+        return None
 
 
 def get(name: str, default: str | None = None) -> str | None:
