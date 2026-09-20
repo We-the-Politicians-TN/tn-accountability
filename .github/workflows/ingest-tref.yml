@@ -1,0 +1,85 @@
+name: TREF ingest
+
+# Tennessee campaign finance. TREF's search is year-granular with no "changed since"
+# filter, so each run re-fetches the current year and reloads that slice.
+#
+# Cadence follows the filing calendar in docs/filing_calendar.md: weekly normally,
+# daily in the fortnight around each statutory deadline, when new filings actually
+# appear. See docs/scraper_health.md for how to tell whether a quiet run means
+# "nothing was filed" or "the scraper broke".
+
+on:
+  schedule:
+    # Weekly, Sundays 07:00 UTC (~02:00 Central).
+    - cron: '0 7 * * 0'
+    # Daily through the fortnight around each quarterly/annual deadline
+    # (Jan 31, Apr 10, Jul 15, Oct 10 — see docs/filing_calendar.md).
+    - cron: '0 7 24-31 1 *'
+    - cron: '0 7 1-7 2 *'
+    - cron: '0 7 3-17 4 *'
+    - cron: '0 7 8-22 7 *'
+    - cron: '0 7 3-17 10 *'
+  workflow_dispatch:
+    inputs:
+      expect_rows:
+        description: 'Fail the run if nothing new is found'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ingest-tref
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    # A full year re-fetch is thousands of paced requests against a state server.
+    timeout-minutes: 330
+    permissions:
+      contents: write        # to commit the download manifests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Sync TREF
+        env:
+          # Must be the SESSION POOLER connection string: the direct Supabase host is
+          # IPv6-only and GitHub runners cannot reach it (see D18 in STATUS.md).
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          EXPECT=""
+          # The scheduled deadline windows expect new filings; a silent zero then
+          # means something is broken, not that Tennessee had a quiet week.
+          if [ "${{ github.event.schedule }}" != "0 7 * * 0" ] && [ -n "${{ github.event.schedule }}" ]; then
+            EXPECT="--expect-rows"
+          fi
+          if [ "${{ inputs.expect_rows }}" = "true" ]; then EXPECT="--expect-rows"; fi
+          PYTHONPATH=src python -m tn_accountability.sync tref $EXPECT
+
+      - name: Keep the raw downloads for 90 days
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tref-raw-${{ github.run_id }}
+          path: data/raw/tref/**/*.csv
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Commit download manifests
+        # The CSVs are far too large for git, and artifacts expire. The manifests are
+        # ~400KB total and carry a SHA-256 per file, so committing them leaves a
+        # permanent, versioned record of exactly what was downloaded and when —
+        # the evidence trail survives even after the artifacts are gone.
+        if: success()
+        run: |
+          git config user.name  "tn-accountability bot"
+          git config user.email "42594056+We-the-Politicians-TN@users.noreply.github.com"
+          git add -f data/raw/tref/**/_manifest.json || true
+          git diff --staged --quiet || git commit -m "TREF ingest manifests $(date -u +%Y-%m-%d)"
+          git push

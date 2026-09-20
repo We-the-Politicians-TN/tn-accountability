@@ -1,0 +1,48 @@
+name: LegiScan ingest
+
+# Bills, sponsorships and roll calls. legiscan.fetch_dataset compares each session's
+# dataset_hash and re-downloads only what changed, so a quiet day costs one API call
+# against a 30,000/month quota.
+
+on:
+  schedule:
+    # Daily 06:00 UTC during session (January-May), when bills actually move.
+    - cron: '0 6 * 1-5 *'
+    # Weekly otherwise.
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+
+concurrency:
+  group: ingest-legiscan
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Sync LegiScan
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          LEGISCAN_API_KEY: ${{ secrets.LEGISCAN_API_KEY }}
+        run: PYTHONPATH=src python -m tn_accountability.sync legiscan
+
+      - name: Commit dataset index
+        if: success()
+        run: |
+          git config user.name  "tn-accountability bot"
+          git config user.email "42594056+We-the-Politicians-TN@users.noreply.github.com"
+          git add -f data/raw/legiscan/_datasets.json || true
+          git diff --staged --quiet || git commit -m "LegiScan dataset index $(date -u +%Y-%m-%d)"
+          git push
