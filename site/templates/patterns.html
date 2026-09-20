@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Patterns for review — We the Politicians TN{% endblock %}
+{% block content %}
+<h1>Patterns for review</h1>
+
+<div class="callout warn">
+  <h3>Read this before reading the list</h3>
+  <p>Nothing on this page is an accusation. Every entry describes a pattern in public
+  records and nothing more. There are ordinary explanations for every one of them:
+  industries donate to the members who work on their issues, and members seek support
+  from those who care about what they work on. That is lawful and open.</p>
+  <p>This list exists so patterns can be examined, not so conclusions can be drawn
+  from it.</p>
+</div>
+
+<h2>How this list is built</h2>
+<p>A legislator appears here when both of the following hold:</p>
+<ol>
+  <li>They received contributions from donors in the <b>same industry</b> as a bill
+      they primarily sponsored, within {{ lookback }} days before introduction; and</li>
+  <li>Their total raised is at or above the median for their chamber.</li>
+</ol>
+<p>Thresholds are stated here deliberately, and they are the same for everyone.
+Party is never an input. <a href="methodology.html">Full method</a>.</p>
+
+<p class="muted"><b>We deliberately do not rank by contribution timing alone.</b>
+Tennessee's in-session contribution ban means nearly every member raises money in the
+same months, so almost every bill has money behind it beforehand. Ranking on that
+would surface whoever introduced bills closest to the fundraising season — a quirk of
+the calendar, presented as though it meant something.</p>
+
+<h2>{{ flagged|length }} legislators, both parties</h2>
+<table class="grid">
+  <thead><tr><th>Legislator</th><th>Party</th><th>Chamber</th>
+    <th class="num">Subject-matched</th><th class="num">vs chamber median</th>
+    <th class="num">Bills</th></tr></thead>
+  <tbody>
+  {% for L in flagged %}
+    <tr>
+      <td><a href="legislator/{{ L.legislator_id }}.html" class="verbatim">{{ L.legislator }}</a></td>
+      <td>{{ L.party or '' }}</td><td>{{ L.chamber or '' }}</td>
+      <td class="num"><b>{{ L.matched_total|money }}</b></td>
+      <td class="num">{{ L.ratio }}×</td>
+      <td class="num">{{ L.matched_bills|length }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

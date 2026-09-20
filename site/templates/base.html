@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}We the Politicians TN{% endblock %}</title>
+<link rel="stylesheet" href="{{ root|default('') }}static/style.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="{{ root|default('') }}index.html">We the Politicians <span>TN</span></a>
+  <nav>
+    <a href="{{ root|default('') }}legislators.html">Legislators</a>
+    <a href="{{ root|default('') }}patterns.html">Patterns for review</a>
+    <a href="{{ root|default('') }}methodology.html">Methodology</a>
+  </nav>
+</header>
+<main>{% block content %}{% endblock %}</main>
+<footer>
+  <p><strong>Sources.</strong> Campaign finance records from the
+     <a href="https://apps.tn.gov/tncamp">Tennessee Registry of Election Finance</a>.
+     Bills, sponsorships and votes from <a href="https://legiscan.com">LegiScan</a>,
+     used under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>;
+     that data has been combined with campaign finance records and is presented
+     alongside them.</p>
+  <p>This site reports what public records show. It does not allege wrongdoing by
+     anyone. Every figure links to its source so you can check it yourself.</p>
+  <p class="muted">Built {{ built_at.strftime('%d %B %Y at %H:%M UTC') }} ·
+     <a href="https://github.com/We-the-Politicians-TN/tn-accountability">Source code and methodology</a> ·
+     <a href="https://github.com/We-the-Politicians-TN/tn-accountability/issues">Report a data error</a></p>
+</footer>
+</body>
+</html>

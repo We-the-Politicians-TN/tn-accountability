@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>What funds your Tennessee legislator, and what they sponsor</h1>
+<p class="lede">Every member of the Tennessee General Assembly, of both parties, with
+their publicly filed campaign finance records shown next to the bills they sponsor and
+the votes they cast. Look up your own representative and see both in one place.</p>
+
+<div class="stats">
+  <div><b>{{ stats.legislators }}</b><span>legislators tracked</span></div>
+  <div><b>{{ '{:,}'.format(stats.linked) }}</b><span>contributions linked</span></div>
+  <div><b>{{ stats.linked_dollars|money }}</b><span>in linked contributions</span></div>
+  <div><b>{{ '{:,}'.format(stats.substantive) }}</b><span>substantive bills</span></div>
+  <div><b>{{ '{:,}'.format(stats.votes) }}</b><span>recorded votes</span></div>
+</div>
+
+<h2>What this is, and what it is not</h2>
+<p>This site does not accuse anyone of anything. It shows patterns in public records
+and gives you the records. Deciding whether any pattern matters is your job, and
+determining whether any rule was broken belongs to the Registry of Election Finance,
+the Ethics Commission, and the courts.</p>
+
+<div class="callout">
+  <h3>Timing alone tells you nothing — and we can show you why</h3>
+  <p>Tennessee bars contributions while the General Assembly is in session. In 2025
+  legislators received <b>{{ '$1,385,084' }}</b> in January and <b>{{ '$1,700' }}</b>
+  in February. Almost every member therefore raises money in the same few months, and
+  almost every bill has money behind it in the preceding weeks.</p>
+  <p>So "this legislator received money shortly before introducing a bill" describes
+  nearly the entire General Assembly. We do not treat it as meaningful on its own.
+  What we look at instead is whether the money came from the
+  <b>same industry the bill concerns</b>. <a href="methodology.html">Read the method</a>.</p>
+</div>
+
+<h2>Top recipients by amount raised</h2>
+<p class="muted">Both parties, all chambers. Raising more than your peers is not
+itself notable — leadership and competitive seats attract money. Shown for context.</p>
+<table class="grid">
+  <thead><tr><th>Legislator</th><th>Party</th><th>Chamber</th>
+    <th class="num">Raised</th><th class="num">vs chamber median</th></tr></thead>
+  <tbody>
+  {% for L in legislators[:12] %}
+    <tr>
+      <td><a href="legislator/{{ L.legislator_id }}.html" class="verbatim">{{ L.legislator }}</a></td>
+      <td>{{ L.party or '' }}</td><td>{{ L.chamber or '' }}</td>
+      <td class="num">{{ L.total_raised|money }}</td>
+      <td class="num">{% if L.ratio %}{{ L.ratio }}×{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p><a class="more" href="legislators.html">See all {{ stats.legislators }} legislators →</a></p>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Methodology — We the Politicians TN{% endblock %}
+{% block content %}
+<h1>Methodology</h1>
+<p class="lede">Everything here is published so you can check the work, disagree with
+it, or reproduce it. The code is open source.</p>
+
+<h2>Where the data comes from</h2>
+<table class="grid">
+<thead><tr><th>Source</th><th>What it provides</th><th>How we get it</th></tr></thead>
+<tbody>
+<tr><td><a href="https://apps.tn.gov/tncamp">TN Registry of Election Finance</a></td>
+    <td>Contributions and expenditures</td><td>Collected from the public search interface</td></tr>
+<tr><td><a href="https://legiscan.com">LegiScan</a></td>
+    <td>Bills, sponsorships, roll-call votes, member records</td>
+    <td>Bulk session archives via their API, used under
+        <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a></td></tr>
+</tbody></table>
+<p>Every stored record keeps the original text exactly as published alongside any
+cleaned version, and records which downloaded file and line it came from. Where a
+source value cannot be read — a filing dated 29 February in a non-leap year, for
+instance — the original is kept and the cleaned field is left empty. We do not guess.</p>
+
+<h2>The in-session contribution ban, and why timing is not our signal</h2>
+<p>Tennessee bars contributions while the General Assembly is in session. The effect
+is not subtle. Contributions to legislators during 2025:</p>
+<table class="grid narrow">
+<tbody>
+<tr><td>January</td><td class="num">$1,385,084</td></tr>
+<tr><td><b>February</b></td><td class="num"><b>$1,700</b></td></tr>
+<tr><td><b>March</b></td><td class="num"><b>$2,498</b></td></tr>
+<tr><td>April</td><td class="num">$18,804</td></tr>
+<tr><td>October</td><td class="num">$1,186,566</td></tr>
+<tr><td>December</td><td class="num">$1,280,101</td></tr>
+</tbody></table>
+<p>Because fundraising is pushed into the months between sessions, and bills are
+introduced early in session, <b>almost every bill has contributions in the weeks
+before it</b>. We tested this: one legislator's bills each showed between $40,150 and
+$45,250 in the preceding {{ lookback }} days — but those were the same contributions
+counted against every bill, because the windows overlap.</p>
+<p><b>So a raw "money before the bill" figure measures the legislative calendar, not
+the bill.</b> We publish it only beside the subject-matched figure, so you can see how
+little it separates one bill from another.</p>
+
+<h2>The measure we do use</h2>
+<p>For each bill a legislator primarily sponsored, we count contributions received in
+the <b>{{ lookback }} days before introduction</b>, but only from donors whose industry
+matches an industry the bill concerns.</p>
+<ul>
+  <li><b>Bill industries</b> come from LegiScan's subject labels, mapped to a published
+      list of industries.</li>
+  <li><b>Donor industries</b> come from the donor's name and, in future, from Ethics
+      Commission lobbyist-employer registrations.</li>
+  <li><b>Ceremonial resolutions are excluded.</b> Memorials honouring constituents,
+      sports teams and retirements carry no policy content — 36% of all bills, and
+      over 90% of resolutions. Pairing one with a donor's industry would be
+      meaningless.</li>
+</ul>
+
+<h2>Comparison to the chamber, never in isolation</h2>
+<p>Each member is compared to the median for their own chamber, because the chambers
+differ substantially:</p>
+<table class="grid narrow"><tbody>
+{% for ch, m in medians.items() %}
+<tr><td>{{ ch|capitalize }} ({{ m.n }} members)</td><td class="num">{{ m.raised|money }} median raised</td></tr>
+{% endfor %}
+</tbody></table>
+<p>Raising more than the median is common and unremarkable on its own: leadership
+positions and competitive districts attract money. Republicans hold both majorities
+and therefore most leadership roles, and their members' figures are higher on average
+as a result. <b>Party is never an input to any threshold, ranking or flag</b> — it is
+shown as a fact about each member, nothing more.</p>
+
+<h2>What we know is incomplete</h2>
+<ul>
+  <li><b>{{ category_coverage }}%</b> of money linked to legislators has an identified
+      donor industry. Most of the remainder is from individuals, who have no industry
+      unless their employer is known.</li>
+  {% if pending_matches %}<li><b>{{ pending_matches }}</b> campaign-finance filer names
+      are still awaiting human confirmation before being attributed to a member. Until
+      confirmed they are counted for no one. We would rather understate than
+      misattribute.</li>{% endif %}
+  {% if missing_years %}<li>Contributions for <b>{{ missing_years|join(', ') }}</b> are
+      not yet collected — the state's system returned errors for those years.</li>{% endif %}
+  <li>Some bills have no recorded passage date in the source data, so post-passage
+      figures are incomplete.</li>
+</ul>
+
+<h2>If you think something warrants examination</h2>
+<p>We do not make determinations about anyone's conduct. If a record here prompts a
+question, the <a href="https://www.tn.gov/tref.html">Registry of Election Finance</a>
+and the <a href="https://www.tn.gov/ethics.html">Tennessee Ethics Commission</a> both
+accept complaints from members of the public. The relevant provisions are in Tennessee
+Code Annotated Titles 2, 3 and 8, and in the House and Senate ethics codes.</p>
+
+<h2>Corrections</h2>
+<p>If a figure here is wrong we want to know and will fix it.
+<a href="https://github.com/We-the-Politicians-TN/tn-accountability/issues">Open an
+issue</a> — including on behalf of a legislator or their staff.</p>
+{% endblock %}

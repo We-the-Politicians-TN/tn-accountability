@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% set root = '../' %}
+{% block title %}{{ L.legislator }} — We the Politicians TN{% endblock %}
+{% block content %}
+<h1 class="verbatim">{{ L.legislator }}</h1>
+<p class="lede">{{ L.party or '' }}{% if L.chamber %} · {{ L.chamber|capitalize }}{% endif %}{% if L.district %} · District {{ L.district }}{% endif %}{% if not L.current %} · no longer serving{% endif %}</p>
+
+<div class="stats">
+  <div><b>{{ L.current_raised|money }}</b><span>raised this Assembly</span></div>
+  <div><b>{{ L.total_raised|money }}</b><span>raised since 2019</span></div>
+  <div><b>{% if L.ratio %}{{ L.ratio }}×{% else %}—{% endif %}</b><span>vs chamber median</span></div>
+  <div><b>{% if L.pac_share_pct %}{{ L.pac_share_pct }}%{% else %}—{% endif %}</b><span>from PACs</span></div>
+  <div><b>{{ L.bills_primary or 0 }}</b><span>bills as primary sponsor</span></div>
+  <div><b>{{ L.total_spent|money }}</b><span>spent</span></div>
+</div>
+
+{% set med = medians.get(L.chamber) %}
+{% if med %}
+<p class="muted">Comparisons use the <b>current General Assembly only</b>, where the
+median {{ L.chamber }} member raised {{ med.raised|money }}. Comparing lifetime totals
+would make longer-serving members look like outliers purely from time in office.
+Ceremonial resolutions are excluded from the bill count.</p>
+{% endif %}
+
+<h2>Contributions over time</h2>
+{% if quarters %}{{ chart|safe }}
+<p class="muted">Note the near-empty quarters: Tennessee bars contributions while the
+General Assembly is in session, so almost every member's giving follows this shape.</p>
+{% else %}<p class="muted">No contributions linked to this member.
+{% if pending_matches %}Some filer names are still awaiting review.{% endif %}</p>{% endif %}
+
+<div class="cols">
+<div>
+<h2>Largest donors</h2>
+{% if donors %}
+<table class="grid"><thead><tr><th>Donor</th><th class="num">Total</th><th class="num">Gifts</th></tr></thead><tbody>
+{% for d in donors %}<tr><td class="verbatim">{{ d.name }}</td><td class="num">{{ d.total|money }}</td><td class="num">{{ d.n }}</td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="muted">None linked.</p>{% endif %}
+</div>
+<div>
+<h2>Largest vendors paid</h2>
+{% if vendors %}
+<table class="grid"><thead><tr><th>Vendor</th><th class="num">Total</th><th class="num">Payments</th></tr></thead><tbody>
+{% for v in vendors %}<tr><td class="verbatim">{{ v.name }}</td><td class="num">{{ v.total|money }}</td><td class="num">{{ v.n }}</td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="muted">None linked.</p>{% endif %}
+</div>
+</div>
+
+<h2>Bills sponsored, with contributions from the same industry</h2>
+{% if L.matched_bills %}
+<p>For each bill below, the <b>matched</b> column counts only money from donors in the
+same industry the bill concerns, received in the {{ lookback }} days before it was
+introduced. The <b>all</b> column is every contribution in that window regardless of
+industry — shown so you can see how little it distinguishes one bill from another.</p>
+<table class="grid">
+  <thead><tr><th>Bill</th><th>Introduced</th><th>Industry</th>
+    <th class="num">Matched</th><th class="num">All</th></tr></thead>
+  <tbody>
+  {% for b in L.matched_bills[:25] %}
+    <tr>
+      <td><span class="verbatim">{{ b.bill }}</span><br><span class="muted verbatim">{{ b.title[:70] }}</span></td>
+      <td>{{ b.introduced }}</td>
+      <td>{{ b.cats|join(', ') }}</td>
+      <td class="num"><b>{{ b.matched|money }}</b></td>
+      <td class="num muted">{{ b.all_pre|money }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="muted">Ceremonial resolutions — memorials honouring constituents, teams and
+retirements — are excluded; they carry no policy content and no industry.</p>
+{% else %}
+<p class="muted">No bills where a donor's industry matches the bill's subject within the
+{{ lookback }}-day window. That is the common case.</p>
+{% endif %}
+
+<div class="callout small">
+  <h3>Checking this yourself</h3>
+  <p>Campaign finance filings: <a href="https://apps.tn.gov/tncamp">apps.tn.gov/tncamp</a>.
+  Bills and votes: <a href="https://wapp.capitol.tn.gov/apps/indexes/">capitol.tn.gov</a>.
+  Bill data via <a href="https://legiscan.com">LegiScan</a> (CC BY 4.0).</p>
+  <p>If you believe a filing or rule requires examination, the
+  <a href="https://www.tn.gov/tref.html">Registry of Election Finance</a> and the
+  <a href="https://www.tn.gov/ethics.html">Tennessee Ethics Commission</a> both accept
+  complaints from the public. Relevant provisions sit in Tennessee Code Annotated
+  Titles 2, 3 and 8, and in the House and Senate ethics codes.</p>
+  <p>Spotted something wrong here?
+  <a href="https://github.com/We-the-Politicians-TN/tn-accountability/issues">Tell us</a>.</p>
+</div>
+{% endblock %}

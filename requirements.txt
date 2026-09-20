@@ -12,3 +12,4 @@ rapidfuzz>=3.0              # name matching (Phase 4: legislators <-> TREF candi
 pytest>=8.0
 ruff>=0.5
 keyring>=24               # macOS Keychain access for secrets
+jinja2>=3.1                # static site templating

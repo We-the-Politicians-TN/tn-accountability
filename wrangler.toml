@@ -1,0 +1,13 @@
+# Cloudflare Worker serving the pre-built static site.
+#
+# The site is generated at build time from Postgres, so no database credential ever
+# reaches a visitor and nothing is queried from the browser. What Cloudflare serves is
+# plain HTML, CSS and one small sort script.
+name = "tn-accountability"
+compatibility_date = "2025-09-01"
+
+[assets]
+directory = "./site/dist"
+# Pretty URLs: /legislator/76 serves legislator/76.html
+html_handling = "auto-trailing-slash"
+not_found_handling = "404-page"

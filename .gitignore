@@ -72,3 +72,6 @@ Thumbs.db
 # Backfill runtime state (the log and PID of a detached run)
 data/raw/tref/backfill.log
 data/raw/tref/backfill.pid
+
+# Generated site output — rebuilt from the database on every deploy
+site/dist/

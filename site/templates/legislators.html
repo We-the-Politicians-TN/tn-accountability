@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}All legislators — We the Politicians TN{% endblock %}
+{% block content %}
+<h1>All legislators</h1>
+<p class="lede">Every member who served from 2019 onward, of either party, whether or
+not anything about them stands out. Click a column heading to sort.</p>
+<p class="muted">Comparisons use the <b>current General Assembly only</b> so members
+are compared like for like — lifetime totals would rank members by length of service.
+Current medians: House {{ medians.house.raised|money if medians.house }}, Senate
+{{ medians.senate.raised|money if medians.senate }}.</p>
+
+<table class="grid sortable" id="t">
+  <thead><tr>
+    <th>Legislator</th><th>Party</th><th>Chamber</th><th>District</th>
+    <th class="num">Raised this Assembly</th><th class="num">vs median</th><th class="num">Raised since 2019</th>
+    <th class="num">PAC %</th><th class="num">Top-10 %</th>
+    <th class="num">Bills</th><th class="num">Subject-matched</th>
+  </tr></thead>
+  <tbody>
+  {% for L in legislators %}
+    <tr>
+      <td><a href="legislator/{{ L.legislator_id }}.html" class="verbatim">{{ L.legislator }}</a>{% if not L.current %} <span class="muted">(former)</span>{% endif %}</td>
+      <td>{{ L.party or '' }}</td><td>{{ L.chamber or '' }}</td><td>{{ L.district or '' }}</td>
+      <td class="num" data-v="{{ L.current_raised or 0 }}">{{ L.current_raised|money }}</td>
+      <td class="num" data-v="{{ L.ratio or 0 }}">{% if L.ratio %}{{ L.ratio }}×{% endif %}</td>
+      <td class="num muted" data-v="{{ L.total_raised or 0 }}">{{ L.total_raised|money }}</td>
+      <td class="num" data-v="{{ L.pac_share_pct or 0 }}">{% if L.pac_share_pct %}{{ L.pac_share_pct }}%{% endif %}</td>
+      <td class="num" data-v="{{ L.top10_concentration_pct or 0 }}">{% if L.top10_concentration_pct %}{{ L.top10_concentration_pct }}%{% endif %}</td>
+      <td class="num" data-v="{{ L.bills_primary or 0 }}">{{ L.bills_primary or 0 }}</td>
+      <td class="num" data-v="{{ L.matched_total or 0 }}">{{ L.matched_total|money }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<script src="static/sort.js"></script>
+{% endblock %}

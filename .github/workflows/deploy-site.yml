@@ -1,0 +1,65 @@
+name: Build and deploy site
+
+# Rebuilds the public site and deploys to Cloudflare.
+#
+# Runs on every push to main, and after each ingest job so the site does not sit on
+# stale numbers. The site is static: it is regenerated from the database each time,
+# rather than querying at page load.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+  workflow_run:
+    # Keep the published figures in step with the data.
+    workflows: ["TREF ingest", "LegiScan ingest"]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Don't publish from a failed ingest: better a slightly stale site than one
+    # built from a half-loaded database.
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Build the site
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        # The build fails on a language-rule violation rather than publishing one.
+        run: PYTHONPATH=src python -m tn_accountability.site_build
+
+      - name: Check something was actually built
+        run: |
+          COUNT=$(find site/dist -name '*.html' | wc -l)
+          echo "built $COUNT pages"
+          # A near-empty build usually means the database was unreachable. Deploying
+          # that would replace a working site with nothing.
+          if [ "$COUNT" -lt 50 ]; then
+            echo "::error::only $COUNT pages built — refusing to deploy"
+            exit 1
+          fi
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
