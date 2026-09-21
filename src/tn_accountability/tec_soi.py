@@ -430,13 +430,25 @@ def main(argv=None) -> int:
     f = sub.add_parser("fetch"); f.add_argument("--years", default="2021-2026")
     f.add_argument("--positions", default=",".join(POSITIONS))
     sub.add_parser("load"); sub.add_parser("match")
+    ap = sub.add_parser("apply", help="approve filings marked Y in a review CSV"); ap.add_argument("file")
     a = p.parse_args(argv)
     if a.cmd == "fetch":
         fetch(parse_years(a.years), [x.strip() for x in a.positions.split(",") if x.strip()])
         return 0
     with psycopg.connect(config.require("DATABASE_URL")) as conn:
         conn.autocommit = False
-        (load if a.cmd == "load" else match)(conn)
+        if a.cmd == "apply":
+            import csv
+            with open(a.file, newline="") as fh:
+                ids = [int(r["disclosure_id"]) for r in csv.DictReader(fh)
+                       if (r.get("approve") or "").strip().lower() in ("y", "yes", "1", "true")]
+            with conn.cursor() as cur:
+                cur.execute("""UPDATE disclosures SET approved=true, approved_by='human review', approved_at=now()
+                               WHERE id = ANY(%s) AND legislator_id IS NOT NULL""", (ids,))
+                log(f"approved {cur.rowcount} filing(s)")
+            conn.commit()
+        else:
+            (load if a.cmd == "load" else match)(conn)
     return 0
 
 

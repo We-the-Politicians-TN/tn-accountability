@@ -171,7 +171,11 @@ def classify(conn) -> None:
         cur.execute("""
             WITH emp AS (SELECT regexp_replace(employer_name,'[^A-Z0-9]','','g') AS k, industry_category, id
                          FROM lobbyist_employers WHERE industry_source IS NOT NULL AND industry_category<>'other'),
-                 don AS (SELECT DISTINCT donor_name, regexp_replace(donor_name,'[^A-Z0-9]','','g') AS k
+                 don AS (SELECT DISTINCT donor_name,
+                                regexp_replace(
+                                  regexp_replace(donor_name,
+                                    '\\s*(POLITICAL ACTION COMMITTEE|PAC-TN|PAC|PCC|EMPLOYEES? PAC|EMPLOYEES|FUND FOR [A-Z ]+|FUND|COMMITTEE|\\(.*\\))\\s*$', '', 'g'),
+                                  '[^A-Z0-9]','','g') AS k
                          FROM contributions WHERE recipient_legislator_id IS NOT NULL AND donor_name IS NOT NULL)
             INSERT INTO donor_category_map (donor_name, category, confidence, assigned_by, notes)
             SELECT d.donor_name, e.industry_category, 85, 'ss8011', 'registered employer of lobbyists #'||e.id
