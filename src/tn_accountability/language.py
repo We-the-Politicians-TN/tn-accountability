@@ -38,7 +38,11 @@ def check_text(text: str, where: str) -> list:
     stripped = re.sub(r"<script.*?</script>", " ", stripped, flags=re.S | re.I)
     # Bill titles and donor names come from source records and are quoted verbatim;
     # they are evidence, not our prose, so they are exempt.
-    stripped = re.sub(r'<[^>]*class="[^"]*\bverbatim\b[^"]*"[^>]*>.*?</[a-z]+>',
+    # Match the element's own closing tag via a backreference. The first version
+    # stopped at the first closing tag of ANY element, so a verbatim <ul> lost its
+    # exemption at the first </li> and a filer's "CIVIL & CRIMINAL LITIGATION"
+    # client interest failed the build (D112).
+    stripped = re.sub(r'<(\w+)[^>]*class="[^"]*\bverbatim\b[^"]*"[^>]*>.*?</\1\s*>',
                       " ", stripped, flags=re.S | re.I)
     low = stripped.lower()
     found = []

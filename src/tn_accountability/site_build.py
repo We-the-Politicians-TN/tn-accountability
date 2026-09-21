@@ -196,6 +196,36 @@ def fetch_all(conn) -> dict:
         d["thresholds"] = [dict(name=r[0], value=r[1], unit=r[2], description=r[3])
                            for r in cur.fetchall()]
 
+        # Statements of Disclosure of Interests: the latest approved filing per member,
+        # with every item. Only approved attributions reach a page (D8 applies here too).
+        cur.execute("""
+            WITH latest AS (
+              SELECT DISTINCT ON (legislator_id) id, legislator_id, report_year, filed_date,
+                     source_url, form, amended
+              FROM disclosures WHERE approved
+              ORDER BY legislator_id, report_year DESC, version DESC)
+            SELECT la.legislator_id, la.report_year, la.filed_date, la.source_url, la.amended,
+                   i.section, i.part, i.seq, i.lines_raw, i.name, i.detail, i.qualifier, i.amount
+            FROM latest la LEFT JOIN disclosure_items i ON i.disclosure_id = la.id
+            ORDER BY la.legislator_id, i.section, i.seq""")
+        disc = {}
+        for (lid, yr, filed, url, amended, sec, part, seq, raw, nm, det, qual, amt) in cur.fetchall():
+            e = disc.setdefault(lid, dict(year=yr, filed=filed, url=url, amended=amended, sections={}))
+            if sec:
+                e["sections"].setdefault(sec, []).append(dict(part=part, raw=raw, name=nm, detail=det,
+                                                              qualifier=qual, amount=amt))
+        d["disclosures"] = disc
+        d["stats"]["disclosed"] = len(disc)
+
+        # Declared leadership PACs and what they raised. Separate from the member's
+        # own totals by design (migration 0016).
+        cur.execute("""SELECT legislator_id, pac_name_raw, tref_names, contributions,
+                              total_raised, first_date, last_date FROM v_leadership_pac_finance""")
+        lp = {}
+        for lid, nm, names, n, tot, f, l in cur.fetchall():
+            lp.setdefault(lid, []).append(dict(name=nm, tref_names=names, n=n, total=tot, first=f, last=l))
+        d["lpacs"] = lp
+
         # Coverage caveats, shown rather than hidden.
         cur.execute("SELECT count(*) FROM legislator_tref_ids WHERE NOT approved")
         d["pending_matches"] = cur.fetchone()[0]
@@ -272,6 +302,7 @@ def build(serve: bool = False) -> int:
         pages.append((f"legislator/{lid}.html", tpl.render(
             L=L, quarters=d["quarters"].get(lid, []),
             donors=d["donors"].get(lid, []), vendors=d["vendors"].get(lid, []),
+            disclosure=d["disclosures"].get(lid), lpacs=d["lpacs"].get(lid, []),
             chart=bar_chart(d["quarters"].get(lid, [])), **common)))
 
     # Enforce the language rules before anything is written.

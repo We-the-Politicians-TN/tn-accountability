@@ -51,3 +51,8 @@ table.grid.narrow{max-width:26rem}
 footer{border-top:1px solid var(--line);padding:1.2rem 1.25rem 2.5rem;color:var(--muted);
   font-size:.86rem;max-width:62rem;margin:0 auto}
 footer a{color:var(--accent)}
+
+.disc{flex:1 1 18rem;min-width:0}
+.disc h3{font-size:.92rem;margin:.9rem 0 .3rem;color:var(--muted)}
+.disc ul{margin:.2rem 0 .6rem 1.1rem;padding:0;font-size:.92rem}
+.disc li{margin:.15rem 0}

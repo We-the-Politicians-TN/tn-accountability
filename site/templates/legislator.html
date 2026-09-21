@@ -22,6 +22,21 @@ would make longer-serving members look like outliers purely from time in office.
 Ceremonial resolutions are excluded from the bill count.</p>
 {% endif %}
 
+{% if lpacs %}
+<div class="callout">
+  <h3>Leadership PAC{% if lpacs|length > 1 %}s{% endif %} this member controls</h3>
+  {% for p in lpacs %}
+  <p><b class="verbatim">{{ p.name }}</b> — declared on this member's Statement of Disclosure
+  of Interests; filed with the Registry as <span class="verbatim">{{ p.tref_names|join(' / ') }}</span>.
+  It has received <b>{{ p.total|money }}</b> from {{ '{:,}'.format(p.n) }} contributions
+  ({{ p.first }} to {{ p.last }}).</p>
+  {% endfor %}
+  <p class="muted">A leadership PAC is a separate committee from the member's own campaign.
+  Its figures are shown here beside the member's, and are <b>not</b> included in the totals
+  above.</p>
+</div>
+{% endif %}
+
 <h2>Contributions over time</h2>
 {% if quarters %}{{ chart|safe }}
 <p class="muted">Note the near-empty quarters: Tennessee bars contributions while the
@@ -74,9 +89,51 @@ retirements — are excluded; they carry no policy content and no industry.</p>
 {{ lookback }}-day window. That is the common case.</p>
 {% endif %}
 
+<h2>Financial interests, as declared</h2>
+{% if disclosure %}
+<p class="muted">From this member's <a href="{{ disclosure.url }}">Statement of Disclosure of
+Interests</a> for {{ disclosure.year }}{% if disclosure.amended %} (amended){% endif %},
+filed {{ disclosure.filed }} under penalty of perjury. Tennessee requires names, not
+amounts, for income and investments. Shown as filed.</p>
+{% set order = ['Legislative Expenses','Sources of Income','Positions Held','Investments',
+                'Lobbying','Professional Services','Retainer Fees','Loans','Leadership PACs',
+                'Blind Trust','Bankruptcy','Services to State Entities'] %}
+{% set labels = {'Legislative Expenses':'Travel and expenses paid by others',
+                 'Sources of Income':'Sources of income (filer and spouse)',
+                 'Positions Held':'Positions held in businesses and organisations',
+                 'Investments':'Investments over $10,000',
+                 'Lobbying':'Lobbying by spouse, child or associate',
+                 'Professional Services':'Professional services, by client interest',
+                 'Retainer Fees':'Retainers from entities that lobby the General Assembly',
+                 'Loans':'Loans over $1,000',
+                 'Leadership PACs':'Leadership PACs controlled',
+                 'Blind Trust':'Blind trust','Bankruptcy':'Bankruptcy',
+                 'Services to State Entities':'Services to state entities'} %}
+<div class="cols">
+{% for sec in order %}
+  {% set items = disclosure.sections.get(sec, []) %}
+  {% if items or sec in ['Legislative Expenses','Lobbying','Retainer Fees','Leadership PACs'] %}
+  <div class="disc">
+    <h3>{{ labels[sec] }}</h3>
+    {% if items %}
+    <ul class="verbatim">
+      {% for it in items %}<li class="verbatim">{% if it.part %}<span class="muted">Part {{ it.part }} · </span>{% endif %}{{ it.raw }}</li>{% endfor %}
+    </ul>
+    {% else %}<p class="muted">None reported.</p>{% endif %}
+  </div>
+  {% endif %}
+{% endfor %}
+</div>
+{% else %}
+<p class="muted">No Statement of Disclosure of Interests has been linked to this member yet.
+{% if not L.current %}Former members are not required to file.{% else %}Filings are matched to
+members by name and confirmed by a person before they appear here.{% endif %}</p>
+{% endif %}
+
 <div class="callout small">
   <h3>Checking this yourself</h3>
   <p>Campaign finance filings: <a href="https://apps.tn.gov/tncamp">apps.tn.gov/tncamp</a>.
+  Statements of Disclosure of Interests: <a href="https://conflict.app.tn.gov/conflict/search.htm">conflict.app.tn.gov</a>.
   Bills and votes: <a href="https://wapp.capitol.tn.gov/apps/indexes/">capitol.tn.gov</a>.
   Bill data via <a href="https://legiscan.com">LegiScan</a> (CC BY 4.0).</p>
   <p>If you believe a filing or rule requires examination, the
