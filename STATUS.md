@@ -12,10 +12,15 @@ append to the Session log and add any new entries to Decisions.
 
 ## Current phase
 
-**Phase 0 — COMPLETE and verified.** Repo public at
-https://github.com/We-the-Politicians-TN/tn-accountability, `.env` confirmed absent.
-**Phase 1 — COMPLETE.** Schema applied to Supabase and functionally verified.
-Next: Phase 2 historical backfill.
+**Phases 0–11 built.** The pipeline runs end to end: collection, loading, matching,
+classification, analysis, scheduled ingest, public site, review queue, the monthly
+health check, and (Phase 11) every disclosed influence channel — Statements of
+Interests on each profile, travel paid by others, sponsored events, leadership PACs.
+Every contribution year 2019–2026 is loaded; the health check reports no failures.
+
+**NOT LAUNCHED.** See `docs/launch_checklist.md`. What remains is human judgement:
+three review files, the repository secrets and first workflow runs, two outside
+reviewers, and the legal conversation.
 
 ---
 
