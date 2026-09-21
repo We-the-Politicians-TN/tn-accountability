@@ -296,15 +296,39 @@ to confirm it works before relying on the schedule.
 
 ## Blockers
 
-- **RESOLVED** — GitHub push. See D15/D16.
-- **RESOLVED** — Supabase connection. See D18/D19.
-- **Supabase Free tier is ~3x too small for Phase 2.** Not blocking yet; see D13.
-- **No Supabase `DATABASE_URL`.** Phase 1's migration is written but **not applied
-  and not validated** — there is no Postgres on this machine (no psql, no Docker),
-  so the SQL has never been parsed by a database. First apply may surface errors.
-- **No `LEGISCAN_API_KEY`.** Required for Phase 3.
+Nothing blocks the pipeline. Everything below is waiting on a person or a running job.
 
----
+**Waiting on a background job (mine to finish):**
+- **2023 contributions** — partitioned download running; 2 of 4 partitions checkpointed.
+  When it completes: `load_tref --years 2023`, `match_tref propose` + `link`,
+  `classify donors`, `healthcheck` (its only FAIL should clear), `site_build`.
+
+**Waiting on the user — data judgement (the pipeline cannot make these calls):**
+- `data/processed/tref_matches_to_review.csv` — 95 campaign-finance filer matches; until
+  approved, that money is counted for nobody.
+- `data/processed/soi_matches_to_review.csv` — 49 held Statement-of-Interests matches;
+  2 current members currently have no linked statement.
+- `data/processed/donor_categories_to_review.csv` — top-200 donors; 147 organisation
+  donors over $10,000 ($10.9M) still uncategorised. The weakest link in the signal.
+
+**Waiting on the user — accounts and correspondence:**
+- GitHub repository secrets (`DATABASE_URL`, `LEGISCAN_API_KEY`, `CLOUDFLARE_API_TOKEN`,
+  `CLOUDFLARE_ACCOUNT_ID`), then one manual run of each workflow. **No workflow has ever
+  run**; D106 found a crash bug in one only by accident.
+- The two bulk-data emails (`docs/tref_bulk_request.md`, `docs/tap_bulk_request.md`).
+- Confirm the filing-deadline dates in `docs/filing_calendar.md` with the Registry
+  (D86 — currently unverified).
+- Supabase dashboard: Advisors → Security; confirm the `service_role` key was never
+  committed or pasted into client code.
+
+**Waiting on the user — before launch (see `docs/launch_checklist.md`):**
+- Two outside reviewers, five pages each; read the Garrett page as his staff would.
+- Spot-check five "Financial interests" sections against the live filings.
+- The legal conversation, with the actual site in front of a media lawyer.
+
+**Resolved (kept for the record):** GitHub push (D15/D16); Supabase connection
+(D18/D19); Supabase capacity (D37/D57/D61); LegiScan key (D44); missing `--force`
+(D106); the three retry bugs (D101, D104).
 
 ## Session log
 
