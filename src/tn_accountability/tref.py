@@ -104,16 +104,31 @@ def _select_all_fields(search_type: str) -> dict:
     }
 
 
-def _form_body(search_type: str, year: int) -> dict:
+# The four contributor types partition the result set: every contribution comes from
+# exactly one of them, so searching each separately and combining covers the year
+# without overlap. Used when a year is too large to page through in one session.
+CONTRIBUTOR_TYPES = ("fromCandidate", "fromPAC", "fromIndividual", "fromOrganization")
+
+
+def _form_body(search_type: str, year: int, only_from: str = None) -> dict:
+    """Build the search form.
+
+    `only_from` restricts to a single contributor type. TREF holds the paging cursor
+    in server-side session state, and for a large year that state gives out part way
+    through — 2023 failed twice, once after 500 pages and once with an HTTP 500.
+    Splitting the year into four disjoint searches keeps each session short enough to
+    survive, and the four together are exactly the whole year.
+    """
     if search_type not in ("contributions", "expenditures"):
         raise ValueError(f"search_type must be contributions or expenditures, got {search_type!r}")
+    if only_from and only_from not in CONTRIBUTOR_TYPES:
+        raise ValueError(f"only_from must be one of {CONTRIBUTOR_TYPES}, got {only_from!r}")
+    from_flags = {t: ("true" if (only_from is None or t == only_from) else "false")
+                  for t in CONTRIBUTOR_TYPES}
     return {
         "searchType": search_type,
         "toType": "both",          # to candidates and committees
-        "fromCandidate": "true",   # from every contributor type
-        "fromPAC": "true",
-        "fromIndividual": "true",
-        "fromOrganization": "true",
+        **from_flags,
         "toCandidate": "true",
         "toPac": "true",
         "toOther": "true",
@@ -205,11 +220,29 @@ class TrefClient:
         apps.tn.gov intermittently drops TLS handshakes (seen as SSLEOFError or
         RemoteDisconnected). Over a full backfill of thousands of requests this
         is a certainty, not a possibility, so every request goes through here.
+
+        Server errors are retried too. 2023 failed after hours of successful
+        downloading because a single HTTP 500 was not caught here and killed the
+        whole year. A 5xx or 429 is the server having a moment; a 4xx means our
+        request is wrong and retrying it would just repeat the mistake, so those
+        are raised immediately.
         """
         last = None
         for attempt in range(1, attempts + 1):
             try:
                 return fn()
+            except requests.exceptions.HTTPError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                if status is None or (status < 500 and status != 429):
+                    raise
+                last = exc
+                if attempt == attempts:
+                    break
+                # Server-side trouble deserves more room than a dropped socket.
+                backoff = min(60, 5 * 2 ** attempt) + random.uniform(0, 3)
+                print(f"    {what}: HTTP {status}, retry {attempt}/{attempts - 1} in {backoff:.1f}s")
+                time.sleep(backoff)
+                continue
             except (requests.exceptions.SSLError,
                     requests.exceptions.ConnectionError,
                     requests.exceptions.Timeout) as exc:
@@ -221,8 +254,12 @@ class TrefClient:
                 time.sleep(backoff)
         raise TrefError(f"{what} failed after {attempts} attempts: {last}") from last
 
-    def fetch_year(self, search_type: str, year: int) -> YearResult:
-        """Download every CSV page for one search type and year."""
+    def fetch_year(self, search_type: str, year: int, only_from: str = None) -> YearResult:
+        """Download every CSV page for one search type and year.
+
+        `only_from` restricts to one contributor type, for years too large to page
+        through in a single session. See `fetch_year_partitioned`.
+        """
         result = YearResult(year=year, search_type=search_type)
 
         # A fresh session per year: the result cursor is server-side state, and
@@ -232,10 +269,18 @@ class TrefClient:
                        f"session init {search_type} {year}")
 
         # The POST redirects to ceresults.htm, so its body is already batch 1.
+        def _post():
+            # raise_for_status must happen INSIDE the retry: called outside, an
+            # HTTP 500 is raised after _retrying has already returned, so the
+            # retry logic never sees it. That is what killed 2023 twice.
+            r = self.session.post(SEARCH_URL,
+                                  data=_form_body(search_type, year, only_from),
+                                  timeout=180)
+            r.raise_for_status()
+            return r
+
         post = self._retrying(
-            lambda: self.session.post(SEARCH_URL, data=_form_body(search_type, year), timeout=120),
-            f"search {search_type} {year}")
-        post.raise_for_status()
+            _post, f"search {search_type} {year}" + (f" [{only_from}]" if only_from else ""))
         page = _parse_results(post.text)
 
         if page.csv_url is None:
@@ -259,7 +304,8 @@ class TrefClient:
             if page.row_count:
                 result.row_count_reported += page.row_count
 
-            path = self.out_dir / f"tn_{search_type}_{year}-{page_no:03d}.csv"
+            suffix = f"-{only_from[4:].lower()}" if only_from else ""
+            path = self.out_dir / f"tn_{search_type}_{year}{suffix}-{page_no:03d}.csv"
             if path.exists():
                 raise TrefError(f"refusing to overwrite existing raw file: {path}")
 
@@ -297,8 +343,12 @@ class TrefClient:
                 break
 
             self._pause(PAGE_DELAY)
-            nxt = self._retrying(lambda: self.session.get(NEXT_URL, timeout=120),
-                                 f"next {search_type} {year} batch {page_no + 1}")
+            def _next():
+                r = self.session.get(NEXT_URL, timeout=120)
+                r.raise_for_status()
+                return r
+
+            nxt = self._retrying(_next, f"next {search_type} {year} batch {page_no + 1}")
             page = _parse_results(nxt.text)
             if page.csv_url is None:
                 raise TrefError(f"lost the CSV link while paging {search_type} {year}")

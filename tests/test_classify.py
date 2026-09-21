@@ -60,3 +60,41 @@ def test_genuinely_ambiguous_names_are_not_asserted():
     file is where a person settles cases like this.
     """
     assert cat("RYMAN HOSPITALITY PROPERTIES PAC") in ("hospitality", "real_estate")
+
+
+def test_retry_covers_server_errors():
+    """HTTP 5xx must be retried; 4xx must not.
+
+    2023's contributions failed twice because raise_for_status() was called OUTSIDE
+    the retry wrapper, so a transient HTTP 500 was raised after _retrying had already
+    returned and killed hours of work. Retrying a 4xx would be pointless — it means
+    our request is wrong, not that the server stumbled.
+    """
+    import requests
+    from tn_accountability.tref import TrefClient, TrefError
+
+    client = TrefClient.__new__(TrefClient)  # no network setup needed
+
+    calls = {"n": 0}
+
+    def flaky_500():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            r = requests.Response()
+            r.status_code = 500
+            r.raise_for_status()
+        return "recovered"
+
+    assert client._retrying(flaky_500, "t", attempts=4) == "recovered"
+    assert calls["n"] == 3
+
+    def always_404():
+        r = requests.Response()
+        r.status_code = 404
+        r.raise_for_status()
+
+    try:
+        client._retrying(always_404, "t", attempts=4)
+        raise AssertionError("404 should not be retried")
+    except requests.exceptions.HTTPError:
+        pass  # correct: fails fast
