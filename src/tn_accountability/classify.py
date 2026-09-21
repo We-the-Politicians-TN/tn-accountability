@@ -175,22 +175,37 @@ def classify_donors(conn) -> None:
 def export_review(conn, limit: int = 200) -> Path:
     """The 200 largest donor entities, for the human review PLAN.md Phase 6 asks for."""
     with conn.cursor() as cur:
+        # The registration match is context for the reviewer, never applied by itself:
+        # registrations say what an employer lobbies about, not what it is (D125).
         cur.execute("""
-            SELECT c.donor_name, count(*) AS n, sum(c.amount) AS total,
-                   m.category, m.confidence, m.reviewed
-            FROM contributions c
-            LEFT JOIN donor_category_map m ON m.donor_name = c.donor_name
-            WHERE c.recipient_legislator_id IS NOT NULL AND c.donor_name IS NOT NULL
-            GROUP BY 1,4,5,6 ORDER BY 3 DESC LIMIT %s""", (limit,))
+            WITH agg AS (
+              SELECT c.donor_name, count(*) AS n, sum(c.amount) AS total
+              FROM contributions c
+              WHERE c.recipient_legislator_id IS NOT NULL AND c.donor_name IS NOT NULL
+              GROUP BY 1 ORDER BY 3 DESC LIMIT %s)
+            SELECT a.donor_name, a.n, a.total, m.category, m.confidence, m.reviewed,
+                   le.employer_name_raw, le.industry_category, le.industry_source,
+                   array_to_string(le.issue_areas[1:4], '; ')
+            FROM agg a
+            LEFT JOIN donor_category_map m ON m.donor_name = a.donor_name
+            LEFT JOIN lobbyist_employers le
+              ON regexp_replace(le.employer_name,'[^A-Z0-9]','','g') =
+                 regexp_replace(regexp_replace(a.donor_name,
+                   '\\s*(POLITICAL ACTION COMMITTEE|PAC-TN|PAC|PCC|EMPLOYEES? PAC|EMPLOYEES|FUND FOR [A-Z ]+|FUND|COMMITTEE|\\(.*\\))\\s*$', '', 'g'),
+                   '[^A-Z0-9]','','g')
+            ORDER BY a.total DESC""", (limit,))
         rows = cur.fetchall()
     out = config.PROJECT_ROOT / "data" / "processed" / "donor_categories_to_review.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(["correct_category", "donor_name", "contributions", "total_dollars",
-                    "proposed_category", "confidence", "already_reviewed"])
-        for name, n, total, cat, conf, rev in rows:
-            w.writerow(["", name, n, f"{total:.2f}", cat or "UNMATCHED", conf or "", rev])
+                    "proposed_category", "confidence", "already_reviewed",
+                    "registered_as_employer", "registration_suggests", "suggestion_basis", "declared_subjects"])
+        for name, n, total, cat, conf, rev, emp, emp_cat, emp_src, subjects in rows:
+            w.writerow(["", name, n, f"{total:.2f}", cat or "UNMATCHED", conf or "", rev,
+                        emp or "", (emp_cat if emp_cat and emp_cat != "other" else "") or "",
+                        emp_src or "", subjects or ""])
     return out
 
 

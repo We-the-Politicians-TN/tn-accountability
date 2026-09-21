@@ -176,27 +176,20 @@ def load(conn) -> None:
 
 
 def classify(conn) -> None:
-    """Donors that are registered employers take the employer's declared industry."""
+    """Withdrawn as an automatic step (migration 0021).
+
+    Registrations say what an employer lobbies about, not what it is, and even the
+    focused-filer rule ran ~40% wrong on the largest donors. The registration match
+    is now a SUGGESTION column in the donor review export (classify.export_review),
+    decided by a person. This command only links donor entities to employers.
+    """
     with conn.cursor() as cur:
-        cur.execute("""
-            WITH emp AS (SELECT regexp_replace(employer_name,'[^A-Z0-9]','','g') AS k, industry_category, id
-                         FROM lobbyist_employers WHERE industry_source IS NOT NULL AND industry_category<>'other'),
-                 don AS (SELECT DISTINCT donor_name,
-                                regexp_replace(
-                                  regexp_replace(donor_name,
-                                    '\\s*(POLITICAL ACTION COMMITTEE|PAC-TN|PAC|PCC|EMPLOYEES? PAC|EMPLOYEES|FUND FOR [A-Z ]+|FUND|COMMITTEE|\\(.*\\))\\s*$', '', 'g'),
-                                  '[^A-Z0-9]','','g') AS k
-                         FROM contributions WHERE recipient_legislator_id IS NOT NULL AND donor_name IS NOT NULL)
-            INSERT INTO donor_category_map (donor_name, category, confidence, assigned_by, notes)
-            SELECT d.donor_name, e.industry_category, 85, 'ss8011', 'registered employer of lobbyists #'||e.id
-            FROM don d JOIN emp e ON e.k = d.k
-            ON CONFLICT (donor_name) DO NOTHING""")   # a gap-filler: never overrides an existing classification
-        n = cur.rowcount
-        cur.execute("""UPDATE donors dd SET lobbyist_employer_id = le.id, industry_category = coalesce(dd.industry_category, le.industry_category)
+        cur.execute("""UPDATE donors dd SET lobbyist_employer_id = le.id
                        FROM lobbyist_employers le
                        WHERE regexp_replace(dd.canonical_name,'[^A-Z0-9]','','g') = regexp_replace(le.employer_name,'[^A-Z0-9]','','g')""")
+        n = cur.rowcount
     conn.commit()
-    log(f"donors classified from employer registrations: {n}")
+    log(f"donor entities linked to registered employers: {n} (no classifications written — see review export)")
 
 
 def main(argv=None) -> int:
