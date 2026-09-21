@@ -1,0 +1,53 @@
+name: Monthly health check
+
+# PLAN.md's monthly checks, run automatically. A checklist someone has to remember
+# gets skipped, and the failure mode is silent — stale data that still looks fine.
+# This opens an issue when something needs attention.
+
+on:
+  schedule:
+    - cron: '0 8 1 * *'      # 08:00 UTC on the 1st
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Run checks
+        id: hc
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set +e
+          PYTHONPATH=src python -m tn_accountability.healthcheck > report.txt 2>&1
+          echo "status=$?" >> $GITHUB_OUTPUT
+          cat report.txt
+          {
+            echo "## Monthly health check"
+            echo '```'
+            cat report.txt
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Open an issue if something needs attention
+        if: steps.hc.outputs.status != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = '```\n' + fs.readFileSync('report.txt', 'utf8') + '\n```\n\n' +
+              'Raised automatically by the monthly health check. See `docs/scraper_health.md`.';
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title: `Health check needs attention — ${new Date().toISOString().slice(0,10)}`,
+              body, labels: ['health-check'],
+            });
