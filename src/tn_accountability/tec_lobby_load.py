@@ -119,15 +119,27 @@ def load(conn) -> None:
                                  p["expenses_range_raw"], p["in_state_events_raw"], p["ceo_raw"], p["cfo_raw"],
                                  f"data/raw/tec/lobby/{year}/reports/{f.name}", r["sha256"], pull))
                     n_rep += cur.rowcount
-            # Employer industry: first mapped non-'other' subject across its reports.
-            cur.execute("""UPDATE lobbyist_employers le SET issue_areas = s.subjects, industry_category = s.cat
-                           FROM (SELECT lr.lobbyist_employer_id,
-                                        (array_agg(DISTINCT sub))[1:20] AS subjects,
-                                        coalesce((SELECT m.category FROM unnest(array_agg(sub)) u(sub)
-                                                  JOIN lobby_subject_category_map m ON m.subject=u.sub
-                                                  WHERE m.category<>'other' LIMIT 1), 'other') AS cat
-                                 FROM lobbying_reports lr, unnest(lr.subjects) sub GROUP BY 1) s
-                           WHERE s.lobbyist_employer_id = le.id""")
+            # Employer industry: the FIRST subject the employer listed, in its latest
+            # report, that maps to a specific industry. An earlier version aggregated
+            # with DISTINCT, which sorts alphabetically, so BNSF Railway came out as
+            # "manufacturing" (economic & industrial development < transportation)
+            # and Belz Investco as "legal" (corrections < property interests). The
+            # filer's own ordering is the signal; alphabetical order is noise (D116).
+            cur.execute("""
+                UPDATE lobbyist_employers le SET issue_areas = s.subjects, industry_category = s.cat
+                FROM (
+                  SELECT DISTINCT ON (lr.lobbyist_employer_id)
+                         lr.lobbyist_employer_id, lr.subjects,
+                         coalesce((SELECT m.category
+                                   FROM unnest(lr.subjects) WITH ORDINALITY u(sub, ord)
+                                   JOIN lobby_subject_category_map m ON m.subject = u.sub
+                                   WHERE m.category <> 'other' ORDER BY u.ord LIMIT 1), 'other') AS cat
+                  FROM lobbying_reports lr
+                  WHERE lr.lobbyist_employer_id IS NOT NULL
+                  ORDER BY lr.lobbyist_employer_id, lr.report_year DESC NULLS LAST,
+                           (lr.period_label = 'current') DESC, lr.report_id DESC
+                ) s
+                WHERE s.lobbyist_employer_id = le.id""")
             cur.execute("UPDATE data_pulls SET status='success', finished_at=now(), rows_added=%s WHERE id=%s", (n_emp+n_lob+n_rep, pull))
         conn.commit()
     log(f"employers {n_emp}, lobbyists {n_lob}, reports {n_rep}")
