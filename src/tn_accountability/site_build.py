@@ -248,6 +248,21 @@ def fetch_all(conn) -> dict:
         cur.execute("SELECT count(*), coalesce(sum(total_expense),0) FROM sponsored_events")
         d["stats"]["events"], d["stats"]["events_total"] = cur.fetchone()
 
+        # Travel and expenses paid by others (SS-8004 Q8): the one benefit channel
+        # disclosed BY the member, so it is attributable to them. Approved filings only.
+        cur.execute("""
+            SELECT d.report_year, l.id, l.full_name_raw, l.party, l.chamber::text, i.part, i.lines_raw,
+                   i.amount, d.source_url
+            FROM disclosure_items i
+            JOIN disclosures d ON d.id = i.disclosure_id AND d.approved
+            JOIN legislators l ON l.id = d.legislator_id
+            WHERE i.section = 'Legislative Expenses'
+            ORDER BY d.report_year DESC, l.full_name_raw, i.part, i.seq""")
+        d["travel"] = [dict(year=r[0], lid=r[1], legislator=r[2], party=r[3], chamber=r[4], part=r[5],
+                            raw=r[6], amount=r[7], url=r[8]) for r in cur.fetchall()]
+        cur.execute("""SELECT count(DISTINCT d.legislator_id), count(DISTINCT d.id) FROM disclosures d WHERE d.approved""")
+        d["stats"]["disclosed_filings"] = cur.fetchone()[1]
+
         # Coverage caveats, shown rather than hidden.
         cur.execute("SELECT count(*) FROM legislator_tref_ids WHERE NOT approved")
         d["pending_matches"] = cur.fetchone()[0]
@@ -314,6 +329,7 @@ def build(serve: bool = False) -> int:
     pages.append(("legislators.html", env.get_template("legislators.html").render(
         legislators=d["legislators"], **common)))
     pages.append(("methodology.html", env.get_template("methodology.html").render(**common)))
+    pages.append(("travel.html", env.get_template("travel.html").render(travel=d["travel"], **common)))
     pages.append(("events.html", env.get_template("events.html").render(
         by_year=bar_chart(d["events_by_year"]), hosts=d["event_hosts"],
         recent=d["recent_events"], **common)))

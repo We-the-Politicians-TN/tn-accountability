@@ -176,7 +176,7 @@ def classify(conn) -> None:
             INSERT INTO donor_category_map (donor_name, category, confidence, assigned_by, notes)
             SELECT d.donor_name, e.industry_category, 85, 'ss8011', 'registered employer of lobbyists #'||e.id
             FROM don d JOIN emp e ON e.k = d.k
-            ON CONFLICT (donor_name) DO NOTHING""")   -- a gap-filler: never overrides an existing classification
+            ON CONFLICT (donor_name) DO NOTHING""")   # a gap-filler: never overrides an existing classification
         n = cur.rowcount
         cur.execute("""UPDATE donors dd SET lobbyist_employer_id = le.id, industry_category = coalesce(dd.industry_category, le.industry_category)
                        FROM lobbyist_employers le

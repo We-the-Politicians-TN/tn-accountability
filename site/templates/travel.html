@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Travel and expenses paid by others — We the Politicians TN{% endblock %}
+{% block content %}
+<h1>Travel and expenses paid by others</h1>
+<p class="lede">Every year each member files a Statement of Disclosure of Interests under
+penalty of perjury. Question 8 asks for two things: <b>Part A</b>, any private contribution
+used to defray the expenses of their legislative duties; <b>Part B</b>, any travel paid for
+by "a person with an interest in Tennessee state public policy" to inform or advise them.
+This is the one benefit channel Tennessee discloses <i>by member</i>, so it can be shown
+against a name. Here is every entry, as filed.</p>
+
+<div class="callout">
+  <h3>How to read this</h3>
+  <p>"None reported" is the norm: most members report nothing here in most years. An entry
+  is a member stating, on the record, who paid for what. It is not an allegation, and there
+  are ordinary reasons for each — conferences, study trips, legislative organisations.
+  Travel paid by a government body or a recognised organisation of public officials need
+  not be disclosed and so does not appear.</p>
+</div>
+
+<div class="stats">
+  <div><b>{{ travel|length }}</b><span>entries, all years</span></div>
+  <div><b>{{ travel|map(attribute='lid')|unique|list|length }}</b><span>members reporting</span></div>
+  <div><b>{{ stats.disclosed }}</b><span>members with a linked statement</span></div>
+</div>
+
+<table class="grid sortable" id="t">
+  <thead><tr><th>Year</th><th>Legislator</th><th>Party</th><th>Chamber</th><th>Part</th>
+    <th>As filed</th><th class="num">Amount</th><th></th></tr></thead>
+  <tbody>
+  {% for t in travel %}
+    <tr>
+      <td data-v="{{ t.year }}">{{ t.year }}</td>
+      <td><a href="legislator/{{ t.lid }}.html" class="verbatim">{{ t.legislator }}</a></td>
+      <td>{{ t.party or '' }}</td><td>{{ t.chamber or '' }}</td>
+      <td>{{ t.part or '' }}</td>
+      <td class="verbatim">{{ t.raw }}</td>
+      <td class="num" data-v="{{ t.amount or 0 }}">{% if t.amount %}${{ '{:,.2f}'.format(t.amount) }}{% endif %}</td>
+      <td>{% if t.url %}<a href="{{ t.url }}">filing</a>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="muted">Source: Tennessee Ethics Commission, Statements of Disclosure of Interests
+(form SS-8004, question 8), TCA § 8-50-501 ff. Members are matched to filings by name
+and confirmed by a person before appearing; unconfirmed filings are shown for no one.
+Bills and votes on this site via LegiScan, CC BY 4.0.</p>
+<script src="static/sort.js"></script>
+{% endblock %}
