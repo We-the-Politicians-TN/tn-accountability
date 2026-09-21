@@ -71,6 +71,19 @@ and therefore most leadership roles, and their members' figures are higher on av
 as a result. <b>Party is never an input to any threshold, ranking or flag</b> — it is
 shown as a fact about each member, nothing more.</p>
 
+<h2>Thresholds currently in force</h2>
+<p>These values decide what appears on the
+<a href="patterns.html">patterns for review</a> page. They are read from the database
+when this page is built, so what you see here is what is actually applied.</p>
+<table class="grid"><thead><tr><th>Setting</th><th class="num">Value</th><th>What it does</th></tr></thead>
+<tbody>
+{% for t in thresholds %}
+<tr><td>{{ t.name }}</td><td class="num">{{ t.value|round(2) }} {{ t.unit }}</td><td>{{ t.description }}</td></tr>
+{% endfor %}
+</tbody></table>
+<p>The same values apply to every legislator. Nothing is added to or removed from the
+list by hand.</p>
+
 <h2>What we know is incomplete</h2>
 <ul>
   <li><b>{{ category_coverage }}%</b> of money linked to legislators has an identified

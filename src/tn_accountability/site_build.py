@@ -182,6 +182,20 @@ def fetch_all(conn) -> dict:
                 lst.append(dict(name=name, total=amt, n=n))
         d["vendors"] = vendors
 
+        # The review queue, one row per (legislator, industry) so no contribution is
+        # counted twice across bills with overlapping windows (D93).
+        cur.execute("""SELECT legislator_id, legislator, party, chamber::text, district,
+                              industry, bill_numbers, bill_count, first_introduced,
+                              last_introduced, matched_total, matched_donors,
+                              member_raised, chamber_median, ratio_to_median
+                       FROM f_review_queue_grouped()""")
+        cols = [c[0] for c in cur.description]
+        d["queue"] = [dict(zip(cols, r)) for r in cur.fetchall()]
+
+        cur.execute("SELECT name, value, unit, description FROM review_thresholds ORDER BY name")
+        d["thresholds"] = [dict(name=r[0], value=r[1], unit=r[2], description=r[3])
+                           for r in cur.fetchall()]
+
         # Coverage caveats, shown rather than hidden.
         cur.execute("SELECT count(*) FROM legislator_tref_ids WHERE NOT approved")
         d["pending_matches"] = cur.fetchone()[0]
@@ -223,6 +237,7 @@ def build(serve: bool = False) -> int:
 
     built_at = dt.datetime.now(dt.timezone.utc)
     common = dict(stats=d["stats"], medians=d["medians"], built_at=built_at,
+                  thresholds=d["thresholds"],
                   lookback=LOOKBACK, pending_matches=d["pending_matches"],
                   category_coverage=d["category_coverage"],
                   missing_years=d["missing_years"])
@@ -248,11 +263,8 @@ def build(serve: bool = False) -> int:
         legislators=d["legislators"], **common)))
     pages.append(("methodology.html", env.get_template("methodology.html").render(**common)))
 
-    flagged = sorted(
-        [L for L in d["legislators"] if L["matched_total"] > 0 and (L["ratio"] or 0) >= 1.0],
-        key=lambda L: -L["matched_total"])
     pages.append(("patterns.html", env.get_template("patterns.html").render(
-        flagged=flagged, **common)))
+        queue=d["queue"], **common)))
 
     tpl = env.get_template("legislator.html")
     for L in d["legislators"]:

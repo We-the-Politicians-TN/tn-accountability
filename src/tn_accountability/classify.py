@@ -35,8 +35,14 @@ DONOR_RULES = [
     # the word to end there. That silently dropped Tennessee Bankers Assn PAC,
     # Tennessee Realtors PAC, Lawyers Involved for TN and many more. Only short or
     # ambiguous tokens keep a trailing boundary.
-    ("healthcare",    r"\b(HOSPITAL|HEALTH|MEDIC|PHYSICIAN|DOCTOR|SURGE|DENTAL|DENTIST|"
-                      r"NURS|PHARMAC|HCA\b|TRISTAR|TENNCARE|CLINIC|THERAP|ORTHO|RADIOL|"
+    # HOSPITAL must not swallow HOSPITALITY, and NURS must not swallow NURSERY.
+    # Both collisions were live: 14 donors and $184,500 of restaurant and hotel money
+    # was counted as health care, including Tennessee Hospitality PAC and Ryman
+    # Hospitality. Caught only by checking a generated report line by line against
+    # its sources — which is why that check is not optional.
+    ("healthcare",    r"\b(HOSPITAL(?!ITY)|HEALTH|MEDIC|PHYSICIAN|DOCTOR|SURGER|SURGIC|"
+                      r"DENTAL|DENTIST|NURSING|NURSE\b|PHARMAC|HCA\b|TRISTAR|TENNCARE|"
+                      r"CLINIC|THERAP|ORTHO|RADIOL|"
                       r"ONCOL|PEDIATR|ANESTH|CHIROPRAC|OPTOMETR|HOSPICE|\bTHA\b|"
                       r"INDEPENDENT MEDICINE|LONG.?TERM CARE|ASSISTED LIVING)"),
     ("insurance",     r"\b(INSURANC|INSURER|UNDERWRIT|ACTUAR|CASUALT|ALLSTATE|"

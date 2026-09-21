@@ -14,14 +14,20 @@
 </div>
 
 <h2>How this list is built</h2>
-<p>A legislator appears here when both of the following hold:</p>
-<ol>
-  <li>They received contributions from donors in the <b>same industry</b> as a bill
-      they primarily sponsored, within {{ lookback }} days before introduction; and</li>
-  <li>Their total raised is at or above the median for their chamber.</li>
-</ol>
-<p>Thresholds are stated here deliberately, and they are the same for everyone.
-Party is never an input. <a href="methodology.html">Full method</a>.</p>
+<p>An entry appears when a legislator received contributions from donors in the
+<b>same industry</b> as bills they primarily sponsored, within the window before
+introduction, and their fundraising this Assembly is at or above their chamber's
+median. The thresholds in force right now:</p>
+<table class="grid narrow"><tbody>
+{% for t in thresholds %}
+<tr><td>{{ t.description }}</td><td class="num">{{ t.value|round(2) }} {{ t.unit }}</td></tr>
+{% endfor %}
+</tbody></table>
+<p>These are the same for every legislator. <b>Party is never an input, and nothing is
+added to or removed from this list by hand.</b> <a href="methodology.html">Full method</a>.</p>
+<p><b>Each contribution is counted once.</b> Bills introduced days apart share
+overlapping windows, so counting per bill would report the same money several times —
+one entry below may cover several bills.</p>
 
 <p class="muted"><b>We deliberately do not rank by contribution timing alone.</b>
 Tennessee's in-session contribution ban means nearly every member raises money in the
@@ -29,21 +35,30 @@ same months, so almost every bill has money behind it beforehand. Ranking on tha
 would surface whoever introduced bills closest to the fundraising season — a quirk of
 the calendar, presented as though it meant something.</p>
 
-<h2>{{ flagged|length }} legislators, both parties</h2>
-<table class="grid">
-  <thead><tr><th>Legislator</th><th>Party</th><th>Chamber</th>
-    <th class="num">Subject-matched</th><th class="num">vs chamber median</th>
-    <th class="num">Bills</th></tr></thead>
+<h2>{{ queue|length }} patterns across {{ queue|map(attribute='legislator_id')|unique|list|length }} legislators</h2>
+<p class="muted">Ranked by contributions from the matching industry — a single stated
+quantity, not a composite score. Every other factor is a column so you can weigh it
+yourself.</p>
+<table class="grid sortable" id="q">
+  <thead><tr><th>Legislator</th><th>Party</th><th>Chamber</th><th>Industry</th>
+    <th class="num">From that industry</th><th class="num">Donors</th>
+    <th class="num">Bills</th><th class="num">vs chamber median</th></tr></thead>
   <tbody>
-  {% for L in flagged %}
+  {% for q in queue %}
     <tr>
-      <td><a href="legislator/{{ L.legislator_id }}.html" class="verbatim">{{ L.legislator }}</a></td>
-      <td>{{ L.party or '' }}</td><td>{{ L.chamber or '' }}</td>
-      <td class="num"><b>{{ L.matched_total|money }}</b></td>
-      <td class="num">{{ L.ratio }}×</td>
-      <td class="num">{{ L.matched_bills|length }}</td>
+      <td><a href="legislator/{{ q.legislator_id }}.html" class="verbatim">{{ q.legislator }}</a></td>
+      <td>{{ q.party or '' }}</td><td>{{ q.chamber or '' }}</td>
+      <td>{{ q.industry.replace('_',' ') }}</td>
+      <td class="num" data-v="{{ q.matched_total }}"><b>{{ q.matched_total|money }}</b></td>
+      <td class="num" data-v="{{ q.matched_donors }}">{{ q.matched_donors }}</td>
+      <td class="num" data-v="{{ q.bill_count }}">{{ q.bill_count }}</td>
+      <td class="num" data-v="{{ q.ratio_to_median or 0 }}">{{ q.ratio_to_median }}×</td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
+<script src="static/sort.js"></script>
+<p class="muted">Republicans hold majorities in both chambers and most leadership and
+committee positions, which attract contributions. They therefore appear here more often.
+The method does not take party into account at any point.</p>
 {% endblock %}
