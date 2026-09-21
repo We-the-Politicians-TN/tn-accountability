@@ -214,43 +214,40 @@ class TrefClient:
         if self.delay:
             time.sleep(random.uniform(*bounds))
 
-    def _retrying(self, fn, what: str, attempts: int = 4):
-        """Retry transient network failures with backoff.
+    def _retrying(self, fn, what: str, attempts: int = 6):
+        """Retry transient failures with backoff.
 
-        apps.tn.gov intermittently drops TLS handshakes (seen as SSLEOFError or
-        RemoteDisconnected). Over a full backfill of thousands of requests this
-        is a certainty, not a possibility, so every request goes through here.
+        Catches `RequestException`, the common base of every transport failure
+        requests raises. Listing individual subclasses was tried and failed three
+        times: first HTTPError escaped (raise_for_status sat outside this wrapper),
+        then ChunkedEncodingError escaped — it inherits from RequestException, not
+        ConnectionError — and discarded 532 successfully downloaded batches because
+        batch 533 ended prematurely.
 
-        Server errors are retried too. 2023 failed after hours of successful
-        downloading because a single HTTP 500 was not caught here and killed the
-        whole year. A 5xx or 429 is the server having a moment; a 4xx means our
-        request is wrong and retrying it would just repeat the mistake, so those
-        are raised immediately.
+        Over a run of thousands of requests against apps.tn.gov, every one of these
+        is a certainty rather than a possibility. The only failure worth surfacing
+        immediately is a 4xx, which means our request is wrong and repeating it
+        would repeat the mistake.
         """
         last = None
         for attempt in range(1, attempts + 1):
             try:
                 return fn()
-            except requests.exceptions.HTTPError as exc:
-                status = exc.response.status_code if exc.response is not None else None
-                if status is None or (status < 500 and status != 429):
-                    raise
+            except requests.exceptions.RequestException as exc:
+                if isinstance(exc, requests.exceptions.HTTPError):
+                    status = exc.response.status_code if exc.response is not None else None
+                    if status is not None and status < 500 and status != 429:
+                        raise           # our request is wrong; retrying changes nothing
+                    detail = f"HTTP {status}"
+                    base = 5            # server trouble deserves more room
+                else:
+                    detail = type(exc).__name__
+                    base = 2
                 last = exc
                 if attempt == attempts:
                     break
-                # Server-side trouble deserves more room than a dropped socket.
-                backoff = min(60, 5 * 2 ** attempt) + random.uniform(0, 3)
-                print(f"    {what}: HTTP {status}, retry {attempt}/{attempts - 1} in {backoff:.1f}s")
-                time.sleep(backoff)
-                continue
-            except (requests.exceptions.SSLError,
-                    requests.exceptions.ConnectionError,
-                    requests.exceptions.Timeout) as exc:
-                last = exc
-                if attempt == attempts:
-                    break
-                backoff = 2 ** attempt + random.uniform(0, 1)
-                print(f"    {what}: {type(exc).__name__}, retry {attempt}/{attempts - 1} in {backoff:.1f}s")
+                backoff = min(90, base * 2 ** attempt) + random.uniform(0, 3)
+                print(f"    {what}: {detail}, retry {attempt}/{attempts - 1} in {backoff:.1f}s")
                 time.sleep(backoff)
         raise TrefError(f"{what} failed after {attempts} attempts: {last}") from last
 

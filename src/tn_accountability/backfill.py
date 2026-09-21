@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import config
-from .tref import TrefClient, TrefError, YEAR_DELAY
+from .tref import CONTRIBUTOR_TYPES, TrefClient, TrefError, YEAR_DELAY
 
 SEARCH_TYPES = ("contributions", "expenditures")
 
@@ -104,17 +104,53 @@ class Backfill:
     def is_done(self, search_type: str, year: int) -> bool:
         return (self.year_dir(search_type, year) / "_manifest.json").exists()
 
-    def run_year(self, search_type: str, year: int) -> dict:
+    def _fetch_partitioned(self, client, search_type: str, year: int, partial) -> None:
+        """Fetch a year as four contributor-type searches, checkpointing each.
+
+        TREF's paging cursor is server-side session state and cannot be resumed, so
+        any failure discards the whole search. For a long year that is brutal: 2023
+        lost 532 successfully downloaded batches because batch 533 ended prematurely.
+
+        The four contributor types partition the result set exactly — every
+        contribution comes from precisely one of them — so fetching each separately
+        gives four shorter sessions AND four checkpoints. A completed partition is
+        marked done and skipped on rerun, so a failure costs at most one partition
+        instead of the year.
+        """
+        partial.mkdir(parents=True, exist_ok=True)
+        for ctype in CONTRIBUTOR_TYPES:
+            marker = partial / f"_{ctype}.done"
+            if marker.exists():
+                log(f"    {ctype}: already complete, skipping")
+                continue
+            # Clear any half-finished files from this partition's last attempt.
+            stale = list(partial.glob(f"tn_{search_type}_{year}-{ctype[4:].lower()}-*.csv"))
+            for f in stale:
+                f.unlink()
+            if stale:
+                log(f"    {ctype}: cleared {len(stale)} file(s) from a previous attempt")
+            log(f"    {ctype}: fetching ...")
+            client.fetch_year(search_type, year, only_from=ctype)
+            n = len(list(partial.glob(f"tn_{search_type}_{year}-{ctype[4:].lower()}-*.csv")))
+            marker.write_text(json.dumps({"batches": n,
+                                          "completed_at": datetime.now(timezone.utc).isoformat()}))
+            log(f"    {ctype}: done, {n} batches checkpointed")
+
+    def run_year(self, search_type: str, year: int, partitioned: bool = False) -> dict:
         final = self.year_dir(search_type, year)
         partial = final.with_name(f"{year}.partial")
 
-        if partial.exists():
+        if partial.exists() and not partitioned:
             log(f"  discarding incomplete {partial.name} (cursor cannot be resumed)")
             shutil.rmtree(partial)
 
         started = time.time()
         client = TrefClient(out_dir=partial, delay=self.delay)
-        result = client.fetch_year(search_type, year)
+
+        if partitioned:
+            self._fetch_partitioned(client, search_type, year, partial)
+        else:
+            client.fetch_year(search_type, year)
 
         files = sorted(partial.glob("*.csv"))
         rows = sum(count_rows(p) for p in files)
@@ -154,6 +190,12 @@ def main(argv=None) -> int:
                         help="show what would be fetched, then exit")
     parser.add_argument("--no-delay", action="store_true",
                         help="skip polite delays — testing only, do not use on a real run")
+    parser.add_argument("--partitioned", action="store_true",
+                        help="fetch each year as four contributor-type searches, "
+                             "checkpointing each. Use for years too long to finish in "
+                             "one session — a failure then costs one partition, not the year")
+    parser.add_argument("--force", action="store_true",
+                        help="re-fetch years already marked complete")
     args = parser.parse_args(argv)
 
     try:
@@ -170,7 +212,7 @@ def main(argv=None) -> int:
     bf = Backfill(root, delay=not args.no_delay)
 
     jobs = [(t, y) for t in types for y in years]
-    todo = [(t, y) for t, y in jobs if not bf.is_done(t, y)]
+    todo = jobs if args.force else [(t, y) for t, y in jobs if not bf.is_done(t, y)]
     done = len(jobs) - len(todo)
 
     log(f"backfill root : {root}")
@@ -201,7 +243,7 @@ def main(argv=None) -> int:
 
         log(f"({i}/{len(todo)}) {search_type} {year} ...")
         try:
-            m = bf.run_year(search_type, year)
+            m = bf.run_year(search_type, year, partitioned=args.partitioned)
         except TrefError as exc:
             # One bad year must not abandon the rest of an overnight run.
             log(f"  FAILED {search_type} {year}: {exc}")
