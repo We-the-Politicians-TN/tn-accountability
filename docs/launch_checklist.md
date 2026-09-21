@@ -23,6 +23,20 @@ wethepoliticianstn.com at it. Ordered by how much damage getting them wrong woul
       should see the actual site, not a description of it. The Reporters Committee for
       Freedom of the Press runs a free hotline.
 
+## Added with Phase 11 (disclosed influence channels)
+
+- [ ] **Review the 49 held Statement of Interests matches**
+      (`data/processed/soi_matches_to_review.csv`; apply with
+      `python -m tn_accountability.tec_soi apply <csv>`). Until approved, those
+      filings show for nobody. Two current members currently have no linked statement.
+- [ ] **Spot-check five profiles' "Financial interests" sections against the live
+      filing** (link is on the page). One was checked line by line on 2026-09-21 and
+      matched; do more, especially members with sponsored travel.
+- [ ] **Read the "Who hosts the legislature" page with the lawyer.** It is sponsor-level
+      and says so; confirm the wording is sufficient.
+- [ ] The donor review file was regenerated after the classifier changed — use the
+      current `donor_categories_to_review.csv`, not an older copy.
+
 ## Should do before launch
 
 - [ ] Add repository secrets so the scheduled jobs run: `DATABASE_URL`,
