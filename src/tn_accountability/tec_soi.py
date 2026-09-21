@@ -191,7 +191,7 @@ H2_RE = re.compile(r'<h2>\s*(.*?)\s*</h2>', re.S)
 FIELDSET_RE = re.compile(r'<fieldset>(.*?)</fieldset>', re.S)
 LEGEND_RE = re.compile(r'<legend>\s*Part\s+([AB])\s*</legend>', re.S)
 P_RE = re.compile(r'<p[^>]*>(.*?)</p>', re.S)
-AMOUNT_RE = re.compile(r'\$\s?([\d,]+(?:\.\d{1,2})?)')
+AMOUNT_RE = re.compile(r'\$\s?([\d,]+(?:\.\d{1,2})?)|(?<![\d.])(\d[\d,]*\.\d{2})\s*$')
 
 
 def _items_from_block(block: str) -> list:
@@ -302,9 +302,10 @@ def load(conn) -> None:
                             else:
                                 body.append(l)
                         am = AMOUNT_RE.search(' '.join(lines))
+                        amt = float((am.group(1) or am.group(2)).replace(',', '')) if am else None
                         rows.append((did, section, part, seq, ' | '.join(lines),
                                      body[0] if body else None, body[1] if len(body) > 1 else None,
-                                     qual, float(am.group(1).replace(',', '')) if am else None))
+                                     qual, amt))
                 if rows:
                     cur.executemany("""INSERT INTO disclosure_items (disclosure_id, section, part, seq,
                                          lines_raw, name, detail, qualifier, amount)
@@ -320,7 +321,37 @@ def load(conn) -> None:
 
 # --- match filers to legislators ----------------------------------------------
 
+NICKNAMES = [
+    {"MICHAEL", "MIKE"}, {"WILLIAM", "BILL", "WILL", "BILLY", "WILLIE"}, {"ROBERT", "BOB", "ROB", "BOBBY"},
+    {"JAMES", "JIM", "JIMMY"}, {"RICHARD", "RICK", "DICK", "RICH"}, {"JOSEPH", "JOE", "JOEY"},
+    {"TIMOTHY", "TIM"}, {"THOMAS", "TOM", "TOMMY"}, {"CHARLES", "CHUCK", "CHARLIE"}, {"EDWARD", "ED", "EDDIE"},
+    {"DANIEL", "DAN", "DANNY"}, {"MATTHEW", "MATT"}, {"ANTHONY", "TONY"}, {"RONALD", "RON", "RONNIE"},
+    {"JOHN", "JACK", "JOHNNY"}, {"JONATHAN", "JON"}, {"GREGORY", "GREG"}, {"JEFFREY", "JEFF"},
+    {"KENNETH", "KEN", "KENNY"}, {"LAWRENCE", "LARRY"}, {"DONALD", "DON"}, {"STEPHEN", "STEVE", "STEVEN"},
+    {"RUSSELL", "RUSTY"}, {"ANDREW", "ANDY", "DREW"}, {"CHRISTOPHER", "CHRIS"}, {"JACOB", "JAKE"},
+    {"SAMUEL", "SAM"}, {"BENJAMIN", "BEN"}, {"NICHOLAS", "NICK"}, {"PATRICK", "PAT"}, {"EUGENE", "GENE", "GINO"},
+    {"REBECCA", "BECKY"}, {"ELIZABETH", "BETH", "LIZ"}, {"MARGARET", "PEGGY", "MEG"}, {"PATRICIA", "PAT", "TRISH"},
+    {"JENNIFER", "JEN", "JENNY"}, {"SUSAN", "SUE"}, {"DEBORAH", "DEBBIE", "DEB"}, {"KATHERINE", "KATHY", "KATE"},
+    {"CYNTHIA", "CINDY"}, {"CHARLANE", "CHARLANE"}, {"JOSHUA", "JOSH"}, {"ZACHARY", "ZACH"}, {"RAYMOND", "RAY"},
+    {"GERALD", "JERRY"}, {"TERRENCE", "TERRY"}, {"VINCENT", "VINCE"}, {"FREDERICK", "FRED"}, {"JEREMIAH", "JEREMY"},
+]
+_NICK = {}
+for grp in NICKNAMES:
+    for n in grp:
+        _NICK.setdefault(n, set()).update(grp)
+
+
+def _norm_full(n: str) -> str:
+    t = re.sub(r'[^A-Z ]', ' ', (n or '').upper())
+    toks = [x for x in t.split() if x not in ('JR', 'SR', 'II', 'III', 'IV')]
+    return ' '.join(toks)
+
+
 def _score(filer: str, leg: dict) -> int:
+    # A filer name identical to the legislator's name is a certain match (G.A.
+    # HARDAWAY scored 84 before this because single-letter tokens were dropped).
+    if _norm_full(filer) and _norm_full(filer) == _norm_full(leg["full_name_raw"]):
+        return 100
     toks = filer.replace('.', ' ').split()
     if not toks:
         return 0
@@ -336,6 +367,9 @@ def _score(filer: str, leg: dict) -> int:
         given_s = max(int(fuzz.ratio(t, k)) for t in f_given for k in known)
         if any(t == k for t in f_given for k in known):
             given_s = max(given_s, 97)
+        # MICHAEL / MIKE and the like: a recognised diminutive is strong evidence.
+        if any(k in _NICK.get(t, ()) for t in f_given for k in known):
+            given_s = max(given_s, 95)
         # JOHN vs JOHNNY, TIM vs TIMOTHY: a prefix is strong evidence
         if any(k.startswith(t) or t.startswith(k) for t in f_given for k in known if min(len(t), len(k)) >= 3):
             given_s = max(given_s, 90)
@@ -354,14 +388,22 @@ def match(conn, auto_score=92, auto_margin=15) -> None:
         cur.execute("""SELECT id, filer_name, chamber::text, report_year FROM disclosures
                        WHERE approved_by IS NULL""")
         discs = cur.fetchall()
+        # Chamber served in the General Assembly that a report year falls in, so a
+        # 2021 filing by a then-Representative is compared against her 112th-GA
+        # seat rather than her current one (D118).
+        cur.execute("SELECT legislator_id, general_assembly, chamber::text FROM legislator_terms")
+        term_chamber = {(lid, ga): ch for lid, ga, ch in cur.fetchall()}
         auto = review = 0
         for did, name, chamber, year in discs:
             # Chamber is a preference, not a filter. LegiScan's 114th data lists
             # Sen. London Lamar as House while the Ethics Commission lists her as
             # Senator; a hard filter found her no candidate at all (D110).
+            ga = 112 + (year - 2021) // 2 if year else None
+            def chamber_then(l):
+                return term_chamber.get((l["id"], ga), l["chamber"])
             def sc(l):
                 base = _score(name, l)
-                return base if (not chamber or l["chamber"] == chamber) else max(0, base - 8)
+                return base if (not chamber or chamber_then(l) == chamber) else max(0, base - 8)
             scored = sorted(((sc(l), l) for l in legs), key=lambda t: -t[0])
             if not scored or scored[0][0] < 70:
                 cur.execute("UPDATE disclosures SET legislator_id=NULL, match_confidence=NULL, "
@@ -372,7 +414,8 @@ def match(conn, auto_score=92, auto_margin=15) -> None:
             margin = best_s - second
             conf = round(max(0.0, best_s - max(0, auto_margin - margin) * 2.0), 2)
             ok = best_s >= auto_score and margin >= auto_margin
-            note = "" if best["chamber"] == chamber else f" CHAMBER MISMATCH filer={chamber} legiscan={best['chamber']}"
+            then = chamber_then(best)
+            note = "" if (not chamber or then == chamber) else f" CHAMBER MISMATCH filer={chamber} legiscan({ga})={then}"
             cur.execute("""UPDATE disclosures SET legislator_id=%s, match_confidence=%s,
                              match_method=%s, approved=%s WHERE id=%s""",
                         (best["id"], conf, f"fuzzy raw={best_s} margin={margin}{note}", ok and not note, did))
