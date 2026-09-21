@@ -206,6 +206,7 @@ reversed, add a new entry that says so and why.
 | D123 | 2026-09-21 | **A declared subject classifies an employer only when the filer is focused — at most three industry-type subjects ticked.** Otherwise the declaration is treated as saying nothing and the name is in the donor review file. | The iLobby form lists subjects alphabetically; Merck ticked 33 of ~48, so its "declared order" was alphabetical and "communications & press" outranked "health & health care". CoreCivic came out "real estate" the same way. Both were gap-filled wrongly before this rule; the unreviewed gap-fills were cleared and re-run. Net: the registration data is a small, safe coverage extender, not the classifier Phase 6 hoped for — the human review of the top-200 donors remains the load-bearing step. |
 | D124 | 2026-09-21 | "property interests" and "utilities/common carriers" no longer classify employers (migration 0020); unambiguous brand names (Pfizer, Merck, Novo Nordisk, CoreCivic, Norfolk Southern, CSX…) classify by name, with tests. | Norfolk Southern, Rogers Group and CoreCivic all ticked *property interests* and were gap-filled as real estate. A brand is exactly the case where a name beats any declared subject, so the largest such donors get bounded, testable name rules rather than a lookup that can be wrong. |
 | D125 | 2026-09-21 | **Automatic donor classification from lobbying registrations is withdrawn** (migration 0021). The registration now appears as a *suggestion* column in the donor review file, decided by a person. "amusement, games, sports" maps to gaming, not hospitality. | With all 1,156 employers loaded, the gap-fill added only 0.5 points of coverage and ran ~40% wrong on the largest cases even under the focused-filer rule: the Tennessee Smoke Free Association (vape-shop trade group) as health care, BusPatrol (school-bus cameras) as education, the Sports Betting Alliance as hospitality. Four iterations (D117, D119, D120, D123) tried to make it safe; the data does not support it. Registrations remain valuable for the events page (101 of 811 hosts keyed) and as reviewer context. |
+| D126 | 2026-09-21 | **2023 contributions loaded.** The partitioned, checkpointed download (D105) completed where three whole-year attempts had failed; the health check has no FAIL. | The year was never the problem — an unretried transient error was (D101, D104). Partitioning by contributor type made the fourth attempt survivable regardless. Every contribution year 2019-2026 is now in the database. |
 | D23 | 2026-09-13 | `.env` is `chmod 600`. | Was `644`, world-readable on a multi-user machine. Disk is FileVault-encrypted and the project is not in a cloud-synced folder, so this closes the remaining local exposure. |
 
 ---
@@ -299,10 +300,7 @@ to confirm it works before relying on the schedule.
 
 Nothing blocks the pipeline. Everything below is waiting on a person or a running job.
 
-**Waiting on a background job (mine to finish):**
-- **2023 contributions** — partitioned download running; 2 of 4 partitions checkpointed.
-  When it completes: `load_tref --years 2023`, `match_tref propose` + `link`,
-  `classify donors`, `healthcheck` (its only FAIL should clear), `site_build`.
+**Waiting on a background job:** nothing. Every year 2019-2026 is loaded.
 
 **Waiting on the user — data judgement (the pipeline cannot make these calls):**
 - `data/processed/tref_matches_to_review.csv` — 95 campaign-finance filer matches; until
