@@ -23,6 +23,7 @@ import psycopg
 from . import config
 from .legiscan import log
 from .tec_soi import _clean
+from .classify import DONOR_RULES, first_match
 
 RAW = config.RAW_DIR / "tec" / "lobby"
 
@@ -140,6 +141,25 @@ def load(conn) -> None:
                            (lr.period_label = 'current') DESC, lr.report_id DESC
                 ) s
                 WHERE s.lobbyist_employer_id = le.id""")
+            # Employer industry, in order of trust (D120):
+            #   1. the employer's NAME, with the same rules that classify donors --
+            #      "BNSF RAILWAY" says transport; "AEP/KINGSPORT POWER" says energy;
+            #   2. otherwise the first industry-type subject it declared;
+            #   3. otherwise 'other'.
+            # Declared subjects are what an employer lobbies ABOUT: AEP lists "insurance"
+            # because it lobbies on insurance, not because it is an insurer. So a subject
+            # may fill a gap but must never outrank an informative name.
+            cur.execute("SELECT id, employer_name_raw, industry_category FROM lobbyist_employers")
+            for eid, nm, declared in cur.fetchall():
+                by_name, _ = first_match(nm, DONOR_RULES)
+                if by_name:
+                    cat, src = by_name, 'name_pattern'
+                elif declared and declared != 'other':
+                    cat, src = declared, 'declared_subject'
+                else:
+                    cat, src = 'other', None
+                cur.execute("UPDATE lobbyist_employers SET industry_category=%s, industry_source=%s WHERE id=%s",
+                            (cat, src, eid))
             cur.execute("UPDATE data_pulls SET status='success', finished_at=now(), rows_added=%s WHERE id=%s", (n_emp+n_lob+n_rep, pull))
         conn.commit()
     log(f"employers {n_emp}, lobbyists {n_lob}, reports {n_rep}")
@@ -150,15 +170,13 @@ def classify(conn) -> None:
     with conn.cursor() as cur:
         cur.execute("""
             WITH emp AS (SELECT regexp_replace(employer_name,'[^A-Z0-9]','','g') AS k, industry_category, id
-                         FROM lobbyist_employers WHERE industry_category IS NOT NULL AND industry_category<>'other'),
+                         FROM lobbyist_employers WHERE industry_source IS NOT NULL AND industry_category<>'other'),
                  don AS (SELECT DISTINCT donor_name, regexp_replace(donor_name,'[^A-Z0-9]','','g') AS k
                          FROM contributions WHERE recipient_legislator_id IS NOT NULL AND donor_name IS NOT NULL)
             INSERT INTO donor_category_map (donor_name, category, confidence, assigned_by, notes)
-            SELECT d.donor_name, e.industry_category, 95, 'ss8011', 'registered employer of lobbyists #'||e.id
+            SELECT d.donor_name, e.industry_category, 85, 'ss8011', 'registered employer of lobbyists #'||e.id
             FROM don d JOIN emp e ON e.k = d.k
-            ON CONFLICT (donor_name) DO UPDATE SET category=EXCLUDED.category, confidence=95,
-                 assigned_by='ss8011', notes=EXCLUDED.notes
-            WHERE NOT donor_category_map.reviewed""")
+            ON CONFLICT (donor_name) DO NOTHING""")   -- a gap-filler: never overrides an existing classification
         n = cur.rowcount
         cur.execute("""UPDATE donors dd SET lobbyist_employer_id = le.id, industry_category = coalesce(dd.industry_category, le.industry_category)
                        FROM lobbyist_employers le
