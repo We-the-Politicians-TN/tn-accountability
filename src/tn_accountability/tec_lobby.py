@@ -82,8 +82,9 @@ def fetch(years) -> None:
             html = dash.read_text()
             # Current report is a link; archived ones are <option value=reportId>End Year 2025</option>.
             reports = {}
-            for rid in re.findall(r'viewExpenditureReport\.htm\?reportId=(\d+)', html):
-                reports[int(rid)] = "current"
+            cur = re.search(r'Current:\s*<a\s+href="viewExpenditureReport\.htm\?reportId=(\d+)"', html, flags=re.S)
+            if cur:
+                reports[int(cur.group(1))] = "current"
             # The option VALUE is the relative report URL, not a bare id, and the label
             # spans lines — the first version of this regex matched nothing (D109).
             for rid, label in re.findall(
@@ -102,7 +103,7 @@ def fetch(years) -> None:
                 e["reports"].append(dict(report_id=rid, label=label, file=rep.name,
                                          sha256=hashlib.sha256(rep.read_bytes()).hexdigest()))
             manifest["employers"].append(e)
-            if i % 100 == 0:
+            if i % 25 == 0:
                 log(f"  {i}/{len(employers)} employers, {n_dash} dashboards + {n_rep} reports fetched so far")
                 (d / "_manifest.json").write_text(json.dumps(manifest, indent=1))
         (d / "_manifest.json").write_text(json.dumps(manifest, indent=1))

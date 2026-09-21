@@ -61,9 +61,16 @@ def parse_dashboard(html: str) -> list:
             cells = [_clean(c) for c in re.findall(r'<td[^>]*>(.*?)</td>', row, flags=re.S)]
             lid = re.search(r'viewLobbyistDashboard\.htm\?lobbyistId=(\d+)', row)
             if cells and lid:
-                out.append(dict(name=cells[0], address=cells[1] if len(cells) > 1 else None,
-                                registered=cells[2] if len(cells) > 2 else None, year=year,
-                                lobbyist_id=int(lid.group(1))))
+                address = cells[1] if len(cells) > 1 else None
+                registered = cells[2] if len(cells) > 2 else None
+                # Some year blocks put the registration date inside the address cell.
+                if registered is None and address:
+                    dm = re.search(r'(\d{4}-\d{2}-\d{2})\s*$', address)
+                    if dm:
+                        registered, address = dm.group(1), address[:dm.start()].strip()
+                ym = re.match(r'(\d{4})', registered or '')
+                out.append(dict(name=cells[0], address=address, registered=registered,
+                                year=int(ym.group(1)) if ym else year, lobbyist_id=int(lid.group(1))))
     return out
 
 

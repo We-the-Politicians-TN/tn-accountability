@@ -226,6 +226,28 @@ def fetch_all(conn) -> dict:
             lp.setdefault(lid, []).append(dict(name=nm, tref_names=names, n=n, total=tot, first=f, last=l))
         d["lpacs"] = lp
 
+        # Sponsored events: who hosts the legislature. Sponsor-level by law; never
+        # attributed to a member (migration 0017).
+        cur.execute("""SELECT event_year, count(*), coalesce(sum(total_expense),0)
+                       FROM sponsored_events GROUP BY 1 ORDER BY 1""")
+        d["events_by_year"] = [(str(y), float(t)) for y, n, t in cur.fetchall()]
+        cur.execute("""
+            SELECT e.sponsor_raw, count(*), coalesce(sum(e.total_expense),0), min(e.event_year), max(e.event_year),
+                   le.industry_category
+            FROM sponsored_events e
+            LEFT JOIN lobbyist_employers le
+              ON regexp_replace(le.employer_name,'[^A-Z0-9]','','g') = regexp_replace(e.sponsor,'[^A-Z0-9]','','g')
+            GROUP BY 1, 6 ORDER BY 3 DESC NULLS LAST LIMIT 60""")
+        d["event_hosts"] = [dict(sponsor=r[0], n=r[1], total=r[2], first=r[3], last=r[4], industry=r[5])
+                            for r in cur.fetchall()]
+        cur.execute("""SELECT event_date_raw, event_name_raw, sponsor_raw, total_expense, per_person, disclosure_url
+                       FROM sponsored_events WHERE event_year >= 2025
+                       ORDER BY event_date DESC NULLS LAST, id DESC LIMIT 120""")
+        d["recent_events"] = [dict(date=r[0], name=r[1], sponsor=r[2], total=r[3], pp=r[4], url=r[5])
+                              for r in cur.fetchall()]
+        cur.execute("SELECT count(*), coalesce(sum(total_expense),0) FROM sponsored_events")
+        d["stats"]["events"], d["stats"]["events_total"] = cur.fetchone()
+
         # Coverage caveats, shown rather than hidden.
         cur.execute("SELECT count(*) FROM legislator_tref_ids WHERE NOT approved")
         d["pending_matches"] = cur.fetchone()[0]
@@ -292,6 +314,9 @@ def build(serve: bool = False) -> int:
     pages.append(("legislators.html", env.get_template("legislators.html").render(
         legislators=d["legislators"], **common)))
     pages.append(("methodology.html", env.get_template("methodology.html").render(**common)))
+    pages.append(("events.html", env.get_template("events.html").render(
+        by_year=bar_chart(d["events_by_year"]), hosts=d["event_hosts"],
+        recent=d["recent_events"], **common)))
 
     pages.append(("patterns.html", env.get_template("patterns.html").render(
         queue=d["queue"], **common)))

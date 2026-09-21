@@ -100,8 +100,9 @@ BANNER_RE = re.compile(r'(\d+) users? found')
 
 
 def _clean(x: str) -> str:
+    import html as _html
     x = re.sub(r'<[^>]+>', ' ', x)
-    x = x.replace('&amp;', '&').replace('&#39;', "'").replace('&quot;', '"')
+    x = _html.unescape(x).replace('\xa0', ' ')   # &nbsp; came through as a literal in names
     return re.sub(r'\s+', ' ', x).strip()
 
 

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Who hosts the legislature — We the Politicians TN{% endblock %}
+{% block content %}
+<h1>Who hosts the legislature</h1>
+<p class="lede">Tennessee bars lobbyists and their employers from giving legislators gifts.
+What the law allows is narrow: an event to which the <b>entire General Assembly</b> is
+invited, capped at a set cost per person per day, reported to the Ethics Commission
+within thirty days. Every such event since 2006 is listed here.</p>
+
+<div class="stats">
+  <div><b>{{ '{:,}'.format(stats.events) }}</b><span>events, 2006–2026</span></div>
+  <div><b>{{ stats.events_total|money }}</b><span>reported cost</span></div>
+</div>
+
+<div class="callout warn">
+  <h3>What this can and cannot tell you</h3>
+  <p>These records name the host and the cost. <b>They never record who attended</b> —
+  the legal condition is that everyone was invited, so no attendance exists. An event
+  here says an organisation spent money hosting the legislature. It says nothing about
+  any individual member, and we do not link it to one.</p>
+</div>
+
+<h2>Reported cost by year</h2>
+{{ by_year|safe }}
+<p class="muted">The dip in 2021 reflects the pandemic year. Amounts are as reported by
+the sponsor; per-person figures are capped by statute ($78 in 2025).</p>
+
+<h2>Largest hosts, all years</h2>
+<table class="grid sortable" id="hosts">
+  <thead><tr><th>Host, as reported</th><th>Industry</th><th class="num">Events</th>
+    <th class="num">Reported cost</th><th class="num">Years</th></tr></thead>
+  <tbody>
+  {% for h in hosts %}
+    <tr>
+      <td class="verbatim">{{ h.sponsor }}</td>
+      <td>{{ (h.industry or '').replace('_',' ') }}</td>
+      <td class="num" data-v="{{ h.n }}">{{ h.n }}</td>
+      <td class="num" data-v="{{ h.total }}">{{ h.total|money }}</td>
+      <td class="num">{{ h.first }}–{{ h.last }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="muted">Industry comes from the host's own lobbying registration, where the
+name matches one; blank means no registration matched by name. The same organisations
+appear among the largest donors to members' campaigns and their leadership PACs.</p>
+
+<h2>Recent events</h2>
+<table class="grid">
+  <thead><tr><th>Date</th><th>Event</th><th>Host</th><th class="num">Cost</th><th class="num">Per person</th><th></th></tr></thead>
+  <tbody>
+  {% for e in recent %}
+    <tr>
+      <td>{{ e.date }}</td>
+      <td class="verbatim">{{ e.name }}</td>
+      <td class="verbatim">{{ e.sponsor }}</td>
+      <td class="num">{{ e.total|money }}</td>
+      <td class="num">{% if e.pp %}${{ '%.2f'|format(e.pp) }}{% endif %}</td>
+      <td>{% if e.url %}<a href="{{ e.url }}">filing</a>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="muted">Source: Tennessee Ethics Commission,
+<a href="https://www.tn.gov/tec/tec-lobbyist/tec-in-state-events.html">In-State Events</a>,
+permitted under TCA § 3-6-305(b)(8)–(9). Bills and votes on this site via LegiScan, CC BY 4.0.</p>
+<script src="static/sort.js"></script>
+{% endblock %}
