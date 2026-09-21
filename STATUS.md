@@ -56,6 +56,20 @@ published figure traces to a source file and line via `data_pull_id`.
 
 ### 3. Patterns, not accusations
 
+### 4. Every disclosed channel of influence, side by side (added 2026-09-21)
+
+The user's stated goal: capture **any method by which a legislator can receive money,
+benefits or items** — contributions, sponsored events, meals, travel, outside income,
+directorships, retainers — so the public sees the full picture of where influence
+could enter, and legislators are accountable to voters rather than to money.
+
+Two things this does and does not mean. It means every *disclosed* channel is shown
+together on a member's page. It does not mean inferring that any of it changed a vote:
+motive is never in the data, and principle 3 stands. Tennessee's gift ban (TCA
+§ 3-6-305) also means the individual "free lunch" is largely illegal rather than merely
+hidden; what is lawful is group events and it is reported. See
+`docs/influence_channels.md`.
+
 Neutral language throughout (PLAN.md Phase 8). The site states what the records show
 and links to them. It does not allege wrongdoing.
 
@@ -173,6 +187,8 @@ reversed, add a new entry that says so and why.
 | D104 | 2026-09-21 | **`_retrying` now catches `requests.RequestException`, the base class** — not a list of subclasses. | Listing subclasses failed three times in a row. First `HTTPError` escaped because `raise_for_status()` sat outside the wrapper. Then **`ChunkedEncodingError` escaped — it inherits from `RequestException`, not `ConnectionError` — and discarded 532 successfully downloaded batches** because batch 533 ended prematurely. Enumerating transient failures is a losing game over thousands of requests; catch the base and carve out only 4xx, which means our request is wrong. |
 | D105 | 2026-09-21 | Years can be fetched **partitioned by contributor type, with a checkpoint per partition** (`--partitioned`). | TREF's paging cursor is server-side session state and cannot be resumed, so any failure discarded the entire year — brutal for 2023 at ~2 hours per attempt. The four contributor types partition the result set exactly, giving four shorter sessions and four checkpoints. A completed partition is marked done and skipped on rerun, so a failure now costs one partition rather than the year. |
 | D106 | 2026-09-21 | **Latent bug found: `backfill` had no `--force` argument**, but the Phase 7 TREF sync workflow passes it. | The scheduled TREF job would have crashed with "unrecognized arguments" on its first run. Found incidentally while adding `--partitioned`. Both flags now exist. **Nothing had ever exercised that workflow end to end** — the secrets are not set yet, so it has never run. |
+| D107 | 2026-09-21 | **Scope widened to every disclosed influence channel** — recorded as governing principle 4. | User direction. Researched the live sources first: TCA § 3-6-305 gift ban and its three event exceptions; In-State Events 2006-2026 (sponsor-level, **attendees never named by statutory design**); SS-8011 employer reports (**ranges, no per-member detail**, but authoritative employer→subject matter); SS-8004 Statements of Interest (**the only per-member channel**: income sources, directorships, investments, sponsored travel Q8B, lobbying ties, retainers, leadership PACs; structured HTML; 220 Reps + 49 Senators listable). Full findings in `docs/influence_channels.md`. **No design decision made yet** — awaiting approval. |
+| D108 | 2026-09-21 | SS-8004 Q15 (leadership PACs) explains `GARRETT PAC`: it is Johnny Garrett's own declared leadership PAC (GARRETTPAC); Sexton's is CAMPAC. | Resolves a Phase 4 ambiguity from the authoritative source rather than by name similarity. A member's leadership PAC can be linked to them deliberately and labelled, not guessed. |
 | D23 | 2026-09-13 | `.env` is `chmod 600`. | Was `644`, world-readable on a multi-user machine. Disk is FileVault-encrypted and the project is not in a cloud-synced folder, so this closes the remaining local exposure. |
 
 ---
