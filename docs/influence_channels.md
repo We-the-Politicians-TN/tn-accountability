@@ -106,3 +106,23 @@ Stating this plainly is part of the method, not a weakness of it:
   requires names and ranges, not figures.
 - Anything about *why* a member voted. Every channel here records what was received
   or held, never motive. The site does not infer motive (governing principle 3).
+
+
+---
+
+## Implemented (2026-09-21)
+
+| Channel | Where it lives | On the site |
+|---|---|---|
+| SS-8004 Statements of Interests, 2021-2026, both chambers | `disclosures`, `disclosure_items`; raw HTML under `data/raw/tec/soi/` | "Financial interests, as declared" on every linked profile; **Travel paid by others** page (Q8) |
+| Leadership PACs (Q15) → TREF | `v_leadership_pacs`, `v_leadership_pac_finance` | Labelled block on the profile, never summed into the member's totals |
+| In-State Events 2006-2026 | `sponsored_events`; raw pages under `data/raw/tec/events/` | **Who hosts the legislature** page, sponsor-level only |
+| SS-8011 reports and registrations | `lobbyist_employers`, `lobbyists`, `lobbying_reports`; raw under `data/raw/tec/lobby/` | Industry on the events page; gap-fills donor industry for focused filers only |
+
+Review files for a person: `data/processed/soi_matches_to_review.csv` (held filings;
+apply with `tec_soi apply`), `data/processed/donor_categories_to_review.csv`.
+
+What the registration data turned out to be worth: less than hoped. Filers tick
+subjects they lobby *about*, and many tick most of the form, so declared subjects
+classify only focused filers. The human review of the largest donors is still the
+step that matters most.

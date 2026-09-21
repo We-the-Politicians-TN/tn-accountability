@@ -149,12 +149,22 @@ def load(conn) -> None:
             # Declared subjects are what an employer lobbies ABOUT: AEP lists "insurance"
             # because it lobbies on insurance, not because it is an insurer. So a subject
             # may fill a gap but must never outrank an informative name.
-            cur.execute("SELECT id, employer_name_raw, industry_category FROM lobbyist_employers")
-            for eid, nm, declared in cur.fetchall():
+            # A declared subject means something only for a FOCUSED filer. The iLobby
+            # form lists subjects alphabetically, so an employer that ticks most boxes
+            # (Merck ticked 33) yields an alphabetical "order" with no emphasis in it,
+            # and "communications & press" came out on top for a pharmaceutical
+            # company. Count the industry-type subjects declared; more than three and
+            # the declaration is treated as saying nothing (D123).
+            cur.execute("""SELECT le.id, le.employer_name_raw, le.industry_category,
+                                  (SELECT count(*) FROM unnest(le.issue_areas) u(sub)
+                                   JOIN lobby_subject_category_map m ON m.subject=u.sub
+                                   WHERE m.category <> 'other')
+                           FROM lobbyist_employers le""")
+            for eid, nm, declared, n_industry_subjects in cur.fetchall():
                 by_name, _ = first_match(nm, DONOR_RULES)
                 if by_name:
                     cat, src = by_name, 'name_pattern'
-                elif declared and declared != 'other':
+                elif declared and declared != 'other' and (n_industry_subjects or 0) <= 3:
                     cat, src = declared, 'declared_subject'
                 else:
                     cat, src = 'other', None

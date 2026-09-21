@@ -88,6 +88,7 @@ Tennessean can make and an algorithm cannot:
   COMMITTEE` or `FRIENDS OF THA` are currently uncategorised; $11.6M of organisation
   money is waiting on exactly this.
 - **Whether a filer name is really a given legislator**, particularly for common
-  surnames and nicknames.
+  surnames and nicknames — both campaign-finance filers and Statement of Interests
+  filers (`data/processed/soi_matches_to_review.csv`).
 - **Whether a bill's subject is right.** LegiScan's labels are broad, and our mapping
   to industries is ours, not theirs.
