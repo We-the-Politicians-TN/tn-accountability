@@ -98,3 +98,13 @@ def test_retry_covers_server_errors():
         raise AssertionError("404 should not be retried")
     except requests.exceptions.HTTPError:
         pass  # correct: fails fast
+
+
+def test_unambiguous_brands_classify_by_name():
+    # Each of these was gap-filled wrongly from a declared subject before the name
+    # rule existed (Norfolk Southern and CoreCivic came out "real estate").
+    assert cat("PFIZER INC. PAC") == "healthcare"
+    assert cat("MERCK SHARP & DOHME LLC") == "healthcare"
+    assert cat("NOVO NORDISK INC.") == "healthcare"
+    assert cat("NORFOLK SOUTHERN CORP") == "transport"
+    assert cat("CORECIVIC, INC. PAC") == "legal"

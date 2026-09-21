@@ -40,7 +40,9 @@ DONOR_RULES = [
     # was counted as health care, including Tennessee Hospitality PAC and Ryman
     # Hospitality. Caught only by checking a generated report line by line against
     # its sources — which is why that check is not optional.
-    ("healthcare",    r"\b(HOSPITAL(?!ITY)|HEALTH|MEDIC|PHYSICIAN|DOCTOR|SURGER|SURGIC|"
+    ("healthcare",    r"\b(PFIZER|MERCK|NOVO NORDISK|AMGEN|ELI LILLY|LILLY|ASTRAZENECA|ZENECA|GLAXO|GSK|"
+                      r"ABBVIE|BRISTOL.?MYERS|JOHNSON & JOHNSON|GILEAD|SANOFI|TAKEDA|BOEHRINGER|GENENTECH|"
+                      r"HOSPITAL(?!ITY)|HEALTH|MEDIC|PHYSICIAN|DOCTOR|SURGER|SURGIC|"
                       r"DENTAL|DENTIST|NURSING|NURSE\b|PHARMAC|HCA\b|TRISTAR|TENNCARE|"
                       r"CLINIC|THERAP|ORTHO|RADIOL|"
                       r"ONCOL|PEDIATR|ANESTH|CHIROPRAC|OPTOMETR|HOSPICE|\bTHA\b|"
@@ -62,11 +64,11 @@ DONOR_RULES = [
                       r"MICROSOFT|GOOGLE|AMAZON|ORACLE|\bIBM\b|COMMUNICATIONS)"),
     ("education",     r"\b(EDUCAT|\bEDUC\b|SCHOOL|TEACHER|UNIVERSIT|COLLEG|ACADEM|"
                       r"CHARTER SCHOOL|STUDENT|\bTEA\b|\bTSSAA\b|LEARNING)"),
-    ("legal",         r"\b(LAWYER|ATTORNEY|LEGAL|TRIAL|BAR ASSOC|LAW FIRM|LITIGAT|"
+    ("legal",         r"\b(CORECIVIC|GEO GROUP|LAWYER|ATTORNEY|LEGAL|TRIAL|BAR ASSOC|LAW FIRM|LITIGAT|"
                       r"COUNSEL|JUSTICE)"),
     ("agriculture",   r"\b(FARM|AGRI|CATTLE|POULTRY|DAIRY|SOYBEAN|COTTON|FORESTR|"
                       r"TIMBER|LUMBER|GROWER|RANCH)"),
-    ("transport",     r"\b(TRUCK|TRANSPORT|RAIL|AIRLINE|AVIAT|LOGISTIC|FREIGHT|"
+    ("transport",     r"\b(NORFOLK SOUTHERN|CSX|BNSF|UNION PACIFIC|TRUCK|TRANSPORT|RAIL|AIRLINE|AVIAT|LOGISTIC|FREIGHT|"
                       r"AUTOMOBILE|AUTO DEALER|CAR DEALER|MOTOR|FEDEX|\bUPS\b|"
                       r"DELIVERY|SHIPPING|TOWING)"),
     ("hospitality",   r"\b(RESTAURANT|HOTEL|MOTEL|LODGING|HOSPITALIT|RETAIL|GROCER|"
